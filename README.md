@@ -15,8 +15,8 @@ Provides, in one versioned place:
 
 - **rtk + rtk-mcp** (Rust Token Killer) installed on PATH, with the global hook wired
   by the shared post-create script.
-- **Dependent features** pulled in automatically (`dependsOn`): `github-cli`, `rust`,
-  `claude-code`. (Add the `python` feature per repo — its version is repo-specific.)
+- **Dependent features** pulled in automatically (`dependsOn`): `python` (3.14),
+  `github-cli`, `rust`, `claude-code`.
 - **Shared env**: `EDITOR=nano`, `CLAUDE_CONFIG_DIR=/home/vscode/.claude`.
 - **Shared VS Code extensions**: yaml, shellcheck, gitlens, markdown-all-in-one,
   GitHub PR. (Repo-type extras — the Python suite, ansible, etc. — go per repo.)
@@ -38,9 +38,7 @@ republishes to GHCR; repos pick it up on their next container rebuild.
     "containerUser": "vscode",
 
     "features": {
-        // repo-specific: python version
-        "ghcr.io/devcontainers/features/python:1": { "version": "3.14" },
-        // everything shared (rtk, gh-cli, rust, claude-code, env, extensions, scripts)
+        // everything shared: python 3.14, rtk, gh-cli, rust, claude-code, env, extensions, scripts
         "ghcr.io/trimmi-de/devcontainer-features/trimmi-base:1": {}
     },
 
