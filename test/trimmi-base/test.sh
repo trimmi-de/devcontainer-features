@@ -1,0 +1,16 @@
+#!/bin/bash
+# Validates the trimmi-base feature. Run with: devcontainer features test -f trimmi-base ...
+set -e
+
+source dev-container-features-test-lib
+
+check "rtk on PATH"            bash -c "command -v rtk"
+check "rtk-mcp on PATH"        bash -c "command -v rtk-mcp"
+check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
+check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
+check "CLAUDE_CONFIG_DIR set"  bash -c '[ "$CLAUDE_CONFIG_DIR" = "/home/vscode/.claude" ]'
+check "EDITOR set"             bash -c '[ "$EDITOR" = "nano" ]'
+check "gh from dependency"     bash -c "command -v gh"
+check "cargo from dependency"  bash -c "command -v cargo || test -x /usr/local/cargo/bin/cargo"
+
+reportResults

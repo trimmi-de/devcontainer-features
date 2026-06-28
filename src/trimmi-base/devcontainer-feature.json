@@ -1,0 +1,38 @@
+{
+    "id": "trimmi-base",
+    "version": "1.0.0",
+    "name": "trimmi-de base dev environment",
+    "description": "Shared dev-container setup for trimmi-de repos: rtk (Rust Token Killer) + rtk-mcp, gh auth from a host-mounted ~/.gh_token_env, Claude Code config, common VS Code extensions and env. Pulls in github-cli, rust, and claude-code as dependencies and ships the shared post-create/post-start lifecycle scripts.",
+    "documentationURL": "https://github.com/trimmi-de/devcontainer-features/tree/main/src/trimmi-base",
+    "options": {
+        "installRtk": {
+            "type": "boolean",
+            "default": true,
+            "description": "Install rtk + rtk-mcp (Rust Token Killer) and wire the global hook."
+        }
+    },
+    "containerEnv": {
+        "EDITOR": "nano",
+        "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "redhat.vscode-yaml",
+                "timonwong.shellcheck",
+                "eamodio.gitlens",
+                "yzhang.markdown-all-in-one",
+                "GitHub.vscode-pull-request-github"
+            ]
+        }
+    },
+    "dependsOn": {
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/rust:1": {},
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils",
+        "ghcr.io/devcontainers/features/rust"
+    ]
+}
