@@ -14,7 +14,10 @@ Shared tooling, env, extensions, and lifecycle scripts live here as a published
 Provides, in one versioned place:
 
 - **rtk + rtk-mcp** (Rust Token Killer) installed on PATH, with the global hook wired
-  by the shared post-create script.
+  by the shared post-create script. `rtk` is fetched as a prebuilt release binary (no
+  compile); `rtk-mcp` builds from source via cargo (it ships no prebuilt binaries).
+  Pin `rtk` with the `rtkVersion` option (default `latest`).
+- **uv** (provides `uvx`, used by each repo's `.mcp.json` to run the serena MCP server).
 - **Dependent features** pulled in automatically (`dependsOn`): `python` (3.14),
   `github-cli`, `rust`, `claude-code`.
 - **Shared env**: `EDITOR=nano`, `CLAUDE_CONFIG_DIR=/home/vscode/.claude`.

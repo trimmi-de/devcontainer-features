@@ -15,18 +15,55 @@ mkdir -p "$SHARE"
 echo "[trimmi-base] installing (installRtk=${INSTALL_RTK})"
 
 # --- rtk + rtk-mcp -----------------------------------------------------------
-# Built with cargo from the rust feature (installsAfter: rust). Install into
-# /usr/local (--root) so the binaries land on PATH for every user, not just root.
+# rtk ships prebuilt static release binaries, so we download one instead of
+# compiling (the cargo build of rtk's icu/zerovec dependency tree takes minutes).
+# rtk-mcp has NO prebuilt binaries, so it still builds from source with cargo
+# (small/fast) — that's the only reason the rust feature is needed for tooling.
+# Everything lands in /usr/local/bin so it's on PATH for every user, not just root.
+RTK_VERSION="${RTKVERSION:-latest}"
 if [ "$INSTALL_RTK" = "true" ]; then
+    case "$(uname -m)" in
+        x86_64)  rtk_target="x86_64-unknown-linux-musl" ;;
+        aarch64) rtk_target="aarch64-unknown-linux-gnu" ;;
+        *)       rtk_target="" ;;
+    esac
+
+    rtk_tag="$RTK_VERSION"
+    if [ "$rtk_tag" = "latest" ]; then
+        rtk_tag="$(curl -fsSL https://api.github.com/repos/rtk-ai/rtk/releases/latest \
+            | grep -oP '"tag_name"\s*:\s*"\K[^"]+' || true)"
+    fi
+
+    rtk_installed=false
+    if [ -n "$rtk_target" ] && [ -n "$rtk_tag" ]; then
+        rtk_url="https://github.com/rtk-ai/rtk/releases/download/${rtk_tag}/rtk-${rtk_target}.tar.gz"
+        echo "[trimmi-base] downloading prebuilt rtk ${rtk_tag} (${rtk_target})"
+        if curl -fsSL "$rtk_url" | tar -xz -C /usr/local/bin rtk; then
+            chmod 0755 /usr/local/bin/rtk
+            rtk_installed=true
+        else
+            echo "[trimmi-base] WARNING: prebuilt rtk download failed; will try cargo"
+        fi
+    fi
+
     export PATH="/usr/local/cargo/bin:${CARGO_HOME:-/usr/local/cargo}/bin:${PATH}"
     if command -v cargo >/dev/null 2>&1; then
-        cargo install --locked --root /usr/local --git https://github.com/rtk-ai/rtk \
-            || echo "[trimmi-base] WARNING: rtk install failed (skipping)"
+        if [ "$rtk_installed" != "true" ]; then
+            cargo install --locked --root /usr/local --git https://github.com/rtk-ai/rtk \
+                || echo "[trimmi-base] WARNING: rtk install failed (skipping)"
+        fi
+        # rtk-mcp: no prebuilt binaries published — build from source.
         cargo install --locked --root /usr/local --git https://github.com/ousamabenyounes/rtk-mcp \
             || echo "[trimmi-base] WARNING: rtk-mcp install failed (skipping)"
     else
-        echo "[trimmi-base] WARNING: cargo not found — ensure the rust feature is present; skipping rtk"
+        echo "[trimmi-base] WARNING: cargo not found — ensure the rust feature is present; skipping rtk-mcp"
     fi
+fi
+
+# --- uv (provides uvx, used to run the serena MCP server; see each repo's .mcp.json) ---
+if ! command -v uv >/dev/null 2>&1; then
+    python3 -m pip install --no-cache-dir uv \
+        || echo "[trimmi-base] WARNING: uv install failed (ensure the python feature is present)"
 fi
 
 # --- shared postStart: git identity + gh auth from the mounted token ----------

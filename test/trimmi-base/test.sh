@@ -6,6 +6,7 @@ source dev-container-features-test-lib
 
 check "rtk on PATH"            bash -c "command -v rtk"
 check "rtk-mcp on PATH"        bash -c "command -v rtk-mcp"
+check "uv on PATH"             bash -c "command -v uv || command -v uvx"
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "CLAUDE_CONFIG_DIR set"  bash -c '[ "$CLAUDE_CONFIG_DIR" = "/home/vscode/.claude" ]'
