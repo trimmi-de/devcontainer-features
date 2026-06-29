@@ -31,20 +31,29 @@ Provides, in one versioned place:
 
 **To change something everywhere:** edit this feature, bump `version` in
 `src/trimmi-base/devcontainer-feature.json`, merge to `main`. The release workflow
-republishes to GHCR; repos pick it up on their next container rebuild.
+republishes the feature to GHCR; the **base-image** workflow then rebuilds the prebuilt
+image (below); repos pick it up on their next container rebuild.
 
-## How a consuming repo references it (thin `devcontainer.json`)
+## How consuming repos reference it — the prebuilt base image
+
+Consuming repos do **not** reference the feature directly. They reference the prebuilt
+**`ghcr.io/trimmi-de/devcontainer-base`** image (built here in [`base-image/`](base-image/),
+which bakes `trimmi-base` + its whole graph). Referencing it via `image:` makes a rebuild a
+layer **pull** with **zero** feature install — no per-rebuild `rtk-mcp` cargo compile. See
+[`base-image/README.md`](base-image/README.md) for the full consumption + update flow.
 
 ```jsonc
 {
     "name": "default",
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "image": "ghcr.io/trimmi-de/devcontainer-base:1",
     "remoteUser": "vscode",
     "containerUser": "vscode",
 
+    // app-specific features only (infra has none); the shared tooling/env/
+    // extensions/scripts come baked into the base image from trimmi-base
     "features": {
-        // everything shared: python 3.14, rtk, gh-cli, rust, claude-code, env, extensions, scripts
-        "ghcr.io/trimmi-de/devcontainer-features/trimmi-base:1": {}
+        "ghcr.io/devcontainers/features/docker-in-docker:2": { "dockerDashComposeVersion": "v2" },
+        "ghcr.io/devcontainers/features/node:1": { "version": "20" }
     },
 
     // host bind-mounts stay per repo (they reference ${localEnv:HOME})
