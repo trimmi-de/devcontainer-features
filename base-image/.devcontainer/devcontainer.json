@@ -1,0 +1,18 @@
+{
+    // Build config for the prebuilt trimmi-de devcontainer base image.
+    //
+    // `devcontainers/ci` builds this and publishes the result as
+    // ghcr.io/trimmi-de/devcontainer-base. It bakes the trimmi-base feature
+    // (and its dependsOn graph: python 3.14, github-cli, rust, claude-code) plus
+    // rtk + rtk-mcp + uv into one image — so consuming repos reference it via
+    // `image:` and skip the per-rebuild rtk-mcp compile entirely.
+    //
+    // App-specific features (docker-in-docker, node) are deliberately NOT baked
+    // here — they install fast and infra doesn't need them, so consumers add
+    // them on top via their own `features:` block.
+    "name": "trimmi-devcontainer-base",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        "ghcr.io/trimmi-de/devcontainer-features/trimmi-base:1": {}
+    }
+}

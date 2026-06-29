@@ -1,0 +1,46 @@
+name: Release devcontainer base image
+
+# Builds and publishes ghcr.io/trimmi-de/devcontainer-base — the prebuilt image
+# that bakes the trimmi-base feature (+ its python/rust/gh/claude graph and
+# rtk/rtk-mcp/uv) so consuming repos reference it via `image:` and skip the
+# per-rebuild rtk-mcp compile.
+#
+# The build is reproducible: it resolves features from the committed
+# base-image/.devcontainer/devcontainer-lock.json. To pull in newer feature
+# releases (a new trimmi-base, python, etc.), refresh that lock deliberately:
+#   devcontainer upgrade --workspace-folder base-image   # then commit + push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "base-image/**"
+      - ".github/workflows/release-base-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push base image
+        uses: devcontainers/ci@v0.3
+        with:
+          subFolder: base-image
+          imageName: ghcr.io/trimmi-de/devcontainer-base
+          imageTag: "1,latest"
+          push: always
+          cacheFrom: ghcr.io/trimmi-de/devcontainer-base
