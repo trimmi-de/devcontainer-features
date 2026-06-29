@@ -95,8 +95,17 @@ set -euo pipefail
 echo "=== [trimmi] git safe.directory ==="
 git config --global --add safe.directory "$(pwd)" || true
 
-echo "=== [trimmi] rtk global hook ==="
-command -v rtk >/dev/null 2>&1 && rtk init -g || echo "WARNING: rtk init skipped (rtk not installed)"
+echo "=== [trimmi] rtk global hook (telemetry left disabled) ==="
+# rtk init prompts once for telemetry consent ([y/N], default N). In a container
+# build that prompt would block, so answer it non-interactively with N. The
+# RTK_TELEMETRY_DISABLED=1 containerEnv (see devcontainer-feature.json) is the
+# hard kill-switch: it blocks all telemetry pings regardless of consent state.
+if command -v rtk >/dev/null 2>&1; then
+    printf 'n\n' | rtk init -g || echo "WARNING: rtk init failed"
+    rtk telemetry disable >/dev/null 2>&1 || true
+else
+    echo "WARNING: rtk init skipped (rtk not installed)"
+fi
 
 echo "=== [trimmi] wiring GH_TOKEN into interactive shells ==="
 # The mounted ~/.gh_token_env is the single source of truth for gh auth; source it

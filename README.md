@@ -20,7 +20,9 @@ Provides, in one versioned place:
 - **uv** (provides `uvx`, used by each repo's `.mcp.json` to run the serena MCP server).
 - **Dependent features** pulled in automatically (`dependsOn`): `python` (3.14),
   `github-cli`, `rust`, `claude-code`.
-- **Shared env**: `EDITOR=nano`, `CLAUDE_CONFIG_DIR=/home/vscode/.claude`.
+- **Shared env**: `EDITOR=nano`, `CLAUDE_CONFIG_DIR=/home/vscode/.claude`,
+  `RTK_TELEMETRY_DISABLED=1` (rtk telemetry off; the consent prompt is also answered
+  `N` non-interactively during install so the container build never blocks).
 - **Shared VS Code extensions**: yaml, shellcheck, gitlens, markdown-all-in-one,
   GitHub PR. (Repo-type extras — the Python suite, ansible, etc. — go per repo.)
 - **Shared lifecycle scripts** installed to `/usr/local/share/trimmi/`:
