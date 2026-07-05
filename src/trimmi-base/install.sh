@@ -92,15 +92,15 @@ fi
 
 # --- aider (AI pair programming; DeepSeek default, OpenRouter available) -------
 # aider is a Python CLI with a heavy dep tree; install it isolated via uv tool
-# (uv installed above). Pin a uv-managed Python 3.12 — the dependency Python is
-# 3.14, too new for aider's deps. All install dirs live under /usr/local so the
-# binary, venv, and managed interpreter are baked in and on PATH for every user.
+# (uv installed above). Use the default Python (3.14) — aider works with it.
+# All install dirs live under /usr/local so the binary, venv, and managed
+# interpreter are baked in and on PATH for every user.
 if [ "$INSTALL_AIDER" = "true" ] && ! command -v aider >/dev/null 2>&1; then
     if command -v uv >/dev/null 2>&1; then
         export UV_TOOL_BIN_DIR=/usr/local/bin
         export UV_TOOL_DIR=/usr/local/share/uv/tools
         export UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python
-        uv tool install --python 3.12 aider-chat \
+        uv tool install aider-chat \
             || echo "[trimmi-base] WARNING: aider install failed (ensure uv + network)"
     else
         echo "[trimmi-base] WARNING: uv not available; skipping aider install"
