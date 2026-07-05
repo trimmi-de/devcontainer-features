@@ -2,7 +2,7 @@ name: Release devcontainer base image
 
 # Builds and publishes ghcr.io/trimmi-de/devcontainer-base — the prebuilt image
 # that bakes the trimmi-base feature (+ its python/rust/gh/claude graph and
-# rtk/rtk-mcp/uv) so consuming repos reference it via `image:` and skip the
+# rtk/rtk-mcp/uv/aider) so consuming repos reference it via `image:` and skip the
 # per-rebuild rtk-mcp compile.
 #
 # The build is reproducible: it resolves features from the committed

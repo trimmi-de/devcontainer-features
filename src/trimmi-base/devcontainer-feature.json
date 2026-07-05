@@ -1,8 +1,8 @@
 {
     "id": "trimmi-base",
-    "version": "1.0.4",
+    "version": "1.1.0",
     "name": "trimmi-de base dev environment",
-    "description": "Shared dev-container setup for trimmi-de repos: rtk (Rust Token Killer) + rtk-mcp, gh auth from a host-mounted ~/.gh_token_env, Claude Code config, common VS Code extensions and env. Pulls in python 3.14, github-cli, rust, and claude-code as dependencies and ships the shared post-create/post-start lifecycle scripts.",
+    "description": "Shared dev-container setup for trimmi-de repos: rtk (Rust Token Killer) + rtk-mcp, aider (AI pair programming, DeepSeek default / OpenRouter via a host-mounted ~/.aider_env), gh auth from a host-mounted ~/.gh_token_env, Claude Code config, common VS Code extensions and env. Pulls in python 3.14, github-cli, rust, and claude-code as dependencies and ships the shared post-create/post-start lifecycle scripts.",
     "documentationURL": "https://github.com/trimmi-de/devcontainer-features/tree/main/src/trimmi-base",
     "options": {
         "installRtk": {
@@ -14,6 +14,11 @@
             "type": "string",
             "default": "latest",
             "description": "rtk release tag to install the prebuilt binary for (e.g. v0.43.0), or 'latest'. rtk-mcp has no prebuilt binaries and always builds from source."
+        },
+        "installAider": {
+            "type": "boolean",
+            "default": true,
+            "description": "Install aider (AI pair programming) via uv, with DeepSeek as the default model. API keys come from a host-mounted ~/.aider_env."
         }
     },
     "containerEnv": {
