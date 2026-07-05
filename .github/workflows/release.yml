@@ -15,7 +15,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Publish features to ghcr.io/trimmi-de/devcontainer-features
         # NOTE: devcontainers/action has no Node 24 release yet (v1.4.3 still
