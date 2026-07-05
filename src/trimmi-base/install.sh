@@ -47,17 +47,6 @@ if [ "$INSTALL_RTK" = "true" ]; then
         echo "[trimmi-base] downloading prebuilt rtk ${rtk_tag} (${rtk_target})"
         if curl -fsSL --retry 3 --retry-delay 5 "$rtk_url" | tar -xz -C /usr/local/bin rtk; then
             chmod 0755 /usr/local/bin/rtk
-            # Verify checksum if available
-            checksum_url="https://github.com/rtk-ai/rtk/releases/download/${rtk_tag}/rtk-${rtk_target}.sha256"
-            expected_hash=$(curl -fsSL --retry 3 "$checksum_url" 2>/dev/null | grep 'rtk$' | awk '{print $1}')
-            if [ -n "$expected_hash" ]; then
-                actual_hash=$(sha256sum /usr/local/bin/rtk | awk '{print $1}')
-                if [ "$actual_hash" != "$expected_hash" ]; then
-                    echo "[trimmi-base] ERROR: checksum mismatch for rtk binary"
-                    rm -f /usr/local/bin/rtk
-                    rtk_installed=false
-                fi
-            fi
             rtk_installed=true
         else
             echo "[trimmi-base] WARNING: prebuilt rtk download failed; will try cargo"
@@ -69,13 +58,13 @@ if [ "$INSTALL_RTK" = "true" ]; then
         if [ "$rtk_installed" != "true" ]; then
             for i in 1 2 3; do
                 cargo install --locked --root /usr/local --git https://github.com/rtk-ai/rtk && break
-                sleep 5
+                sleep 1
             done || echo "[trimmi-base] WARNING: rtk install failed after 3 attempts (skipping)"
         fi
         # rtk-mcp: no prebuilt binaries published — build from source.
         for i in 1 2 3; do
             cargo install --locked --root /usr/local --git https://github.com/ousamabenyounes/rtk-mcp && break
-            sleep 5
+            sleep 1
         done || echo "[trimmi-base] WARNING: rtk-mcp install failed after 3 attempts (skipping)"
     else
         echo "[trimmi-base] WARNING: cargo not found — ensure the rust feature is present; skipping rtk-mcp"

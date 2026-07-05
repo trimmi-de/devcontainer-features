@@ -1,2 +1,5 @@
 # Serena MCP local state (project.yml/cache regenerate on demand)
 .serena/
+
+# aider local state (chat/input history + repo-map cache regenerate on demand)
+.aider*
