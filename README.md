@@ -57,6 +57,27 @@ Provides, in one versioned place:
 republishes the feature to GHCR; the **base-image** workflow then rebuilds the prebuilt
 image (below); repos pick it up on their next container rebuild.
 
+## Using Claude Code and aider inside the container
+
+Both tools are available on `PATH` as soon as the container starts.
+
+### Claude Code
+
+Run `claude` from the repo root. It reads its credentials from the host-mounted
+`~/.claude` directory (bind‑mounted read‑only). Project‑specific settings live in
+`.claude/settings.json` (committed to the repo). The shared `CLAUDE.md` at the repo
+root is automatically loaded as context.
+
+### Aider
+
+Run `aider` from the repo root. It loads API keys from the host‑mounted
+`~/.aider_env` file (bind‑mounted read‑only). The default model is DeepSeek
+(`AIDER_MODEL=deepseek`). To use OpenRouter, pass `--model openrouter/...` on the
+command line. The repo’s `CLAUDE.md` is injected as read‑only context via
+`AIDER_READ=CLAUDE.md`.
+
+See the **Aider API keys** section below for one‑time host setup.
+
 ## How consuming repos reference it — the prebuilt base image
 
 Consuming repos do **not** reference the feature directly. They reference the prebuilt
