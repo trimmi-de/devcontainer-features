@@ -1,16 +1,20 @@
 #!/bin/bash
 # Validates the trimmi-base feature. Run with: devcontainer features test -f trimmi-base ...
-set -e
+# NOTE: no `set -e` — the test lib's `check` returns non-zero on failure by design
+# and accumulates into FAILED[]; `reportResults` exits 1 at the end. With `set -e`
+# the suite aborts at the first failing check and hides the rest.
 
 source dev-container-features-test-lib
 
 check "rtk on PATH"            bash -c "command -v rtk"
 check "rtk works"              bash -c "rtk --version"
 check "rtk-mcp on PATH"        bash -c "command -v rtk-mcp"
-check "rtk-mcp works"          bash -c "rtk-mcp --help"
+# rtk-mcp has no --help/--version; it just starts the stdio server (banner to
+# stderr) and exits non-zero on EOF stdin. Smoke-test by confirming that banner.
+check "rtk-mcp works"          bash -c "timeout 15 rtk-mcp </dev/null 2>&1 | grep -q 'Starting RTK-MCP server'"
 check "uv on PATH"             bash -c "command -v uv || command -v uvx"
 check "aider on PATH"          bash -c "command -v aider"
-check "aider works"            bash -c "aider --help 2>&1 | head -5"
+check "aider works"            bash -c "aider --version"
 check "AIDER_MODEL set"        bash -c '[ "$AIDER_MODEL" = "deepseek" ]'
 check "AIDER_ENV_FILE set"     bash -c '[ "$AIDER_ENV_FILE" = "/home/vscode/.aider_env" ]'
 check "AIDER_READ set"         bash -c '[ "$AIDER_READ" = "CLAUDE.md" ]'
