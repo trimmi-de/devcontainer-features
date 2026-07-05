@@ -1,5 +1,18 @@
 # trimmi-de dev container features
 
+## Quick start
+
+```bash
+# 1. Clone any trimmi-de repo
+git clone <repo-url> && cd <repo>
+
+# 2. Open in VS Code with Dev Containers
+code .
+
+# 3. First time? Set up API keys on your host (one-time):
+#    See "Aider API keys" section below
+```
+
 The **one place** that keeps every `trimmi-de` repo's devcontainer from diverging.
 Shared tooling, env, extensions, and lifecycle scripts live here as a published
 [Dev Container Feature](https://containers.dev/implementors/features/); each repo's
@@ -94,7 +107,8 @@ A repo's own `.devcontainer/post-create.sh` shrinks to just its repo-specific st
 `.mcp.json` and `.claude/settings.json` remain committed per repo (they're
 project-scoped files Claude Code reads from the repo root, not container state).
 
-## Aider API keys (DeepSeek / OpenRouter)
+<details>
+<summary>Aider API keys (DeepSeek / OpenRouter) — click to expand</summary>
 
 aider is baked into the base image, but the API keys are **not** — they live in a host-mounted
 read-only `~/.aider_env` (same pattern as `~/.gh_token_env`), so keys never enter the image, git,
@@ -128,6 +142,8 @@ same way Claude Code reads its creds from the bind-mounted `~/.claude`). The def
 
 To rotate a key: revoke the old one in the provider dashboard, edit `~/.aider_env`, then restart the
 container (aider picks it up on next launch).
+
+</details>
 
 ## Local development
 

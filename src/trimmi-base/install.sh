@@ -11,6 +11,12 @@ INSTALL_RTK="${INSTALLRTK:-true}"
 INSTALL_AIDER="${INSTALLAIDER:-true}"
 
 SHARE=/usr/local/share/trimmi
+# Determine the remote user's home directory dynamically
+if [ -n "${_REMOTE_USER:-}" ]; then
+    USER_HOME=$(getent passwd "$_REMOTE_USER" 2>/dev/null | cut -d: -f6) || USER_HOME="$HOME"
+else
+    USER_HOME="$HOME"
+fi
 mkdir -p "$SHARE"
 
 echo "[trimmi-base] installing (installRtk=${INSTALL_RTK})"
@@ -81,7 +87,7 @@ if ! command -v uv >/dev/null 2>&1; then
     curl -fsSL --retry 3 https://astral.sh/uv/install.sh | sh \
         || echo "[trimmi-base] WARNING: uv install failed"
     # Ensure uv is on PATH for subsequent commands
-    export PATH="$HOME/.cargo/bin:$PATH"
+    export PATH="$USER_HOME/.cargo/bin:$PATH"
 fi
 
 # --- aider (AI pair programming; DeepSeek default, OpenRouter available) -------

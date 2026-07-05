@@ -52,5 +52,9 @@
         "ghcr.io/devcontainers/features/common-utils",
         "ghcr.io/devcontainers/features/python",
         "ghcr.io/devcontainers/features/rust"
+    ],
+    "capAdd": [],
+    "securityOpt": [
+        "seccomp=default"
     ]
 }
