@@ -27,7 +27,9 @@
         "RTK_TELEMETRY_DISABLED": "1",
         "AIDER_MODEL": "deepseek",
         "AIDER_ENV_FILE": "/home/vscode/.aider_env",
-        "AIDER_READ": "CLAUDE.md"
+        "AIDER_READ": "CLAUDE.md",
+        "AIDER_AUTO_COMMITS": "false",
+        "AIDER_AUTO_MAIN_BRANCH": "false"
     },
     "customizations": {
         "vscode": {
