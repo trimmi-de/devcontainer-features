@@ -1,0 +1,37 @@
+{
+    // Dev environment for working ON this repo (authoring/testing the trimmi-base
+    // feature). Consumes the prebuilt base image the same way any trimmi-de repo
+    // does, then adds the two things needed to build/test Dev Container Features
+    // here: node (for the @devcontainers/cli) and docker-in-docker (to run the
+    // nested container builds that `devcontainer features test` / `build` spin up).
+    //
+    // NOTE: this is NOT the base-image build recipe — that's base-image/.devcontainer/.
+    "name": "devcontainer-features",
+    "image": "ghcr.io/trimmi-de/devcontainer-base:1",
+    "remoteUser": "vscode",
+    "containerUser": "vscode",
+
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": { "dockerDashComposeVersion": "v2" },
+        "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+    },
+
+    // Host bind-mounts: shared tooling reads its creds/config from these (Claude
+    // from ~/.claude, gh from ~/.gh_token_env, aider from ~/.aider_env, serena
+    // state from ~/.serena). Same set every trimmi-de repo mounts.
+    "mounts": [
+        { "source": "${localEnv:HOME}/.claude", "target": "/home/vscode/.claude", "type": "bind" },
+        { "source": "${localEnv:HOME}/.serena", "target": "/home/vscode/.serena", "type": "bind" },
+        "source=${localEnv:HOME}/.gh_token_env,target=/home/vscode/.gh_token_env,type=bind,readonly",
+        "source=${localEnv:HOME}/.aider_env,target=/home/vscode/.aider_env,type=bind,readonly"
+    ],
+
+    "remoteEnv": {
+        "HOST_GIT_USER": "${localEnv:GIT_AUTHOR_NAME}",
+        "HOST_GIT_EMAIL": "${localEnv:GIT_AUTHOR_EMAIL}"
+    },
+
+    "postStartCommand": "bash /usr/local/share/trimmi/post-start.sh",
+    // shared base setup first, then install the CLI used to test/publish features here
+    "postCreateCommand": "bash /usr/local/share/trimmi/post-create.sh && npm install -g @devcontainers/cli"
+}
