@@ -73,23 +73,28 @@ fi
 
 # --- uv (provides uvx, used to run the serena MCP server; see each repo's .mcp.json) ---
 if ! command -v uv >/dev/null 2>&1; then
-    curl -fsSL --retry 3 https://astral.sh/uv/install.sh | sh \
+    # Install uv + uvx into /usr/local/bin so they're on PATH for every user at
+    # runtime (same as rtk/rtk-mcp/aider). The installer otherwise defaults to
+    # ~/.local/bin, which isn't on the global PATH and is root-owned during the
+    # image build, so `uv` wouldn't be found later.
+    curl -fsSL --retry 3 https://astral.sh/uv/install.sh \
+        | env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh \
         || echo "[trimmi-base] WARNING: uv install failed"
-    # Ensure uv is on PATH for subsequent commands
-    export PATH="$USER_HOME/.cargo/bin:$PATH"
 fi
 
 # --- aider (AI pair programming; DeepSeek default, OpenRouter available) -------
 # aider is a Python CLI with a heavy dep tree; install it isolated via uv tool
-# (uv installed above). Use the default Python (3.14) — aider works with it.
-# All install dirs live under /usr/local so the binary, venv, and managed
-# interpreter are baked in and on PATH for every user.
+# (uv installed above). Pin to Python 3.12: aider's transitive scipy dependency
+# has no wheel for the default Python 3.14 yet and fails to build from source.
+# uv fetches a managed 3.12 interpreter into UV_PYTHON_INSTALL_DIR. All install
+# dirs live under /usr/local so the binary, venv, and interpreter are baked in
+# and on PATH for every user.
 if [ "$INSTALL_AIDER" = "true" ] && ! command -v aider >/dev/null 2>&1; then
     if command -v uv >/dev/null 2>&1; then
         export UV_TOOL_BIN_DIR=/usr/local/bin
         export UV_TOOL_DIR=/usr/local/share/uv/tools
         export UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python
-        uv tool install aider-chat \
+        uv tool install --python 3.12 aider-chat \
             || echo "[trimmi-base] WARNING: aider install failed (ensure uv + network)"
     else
         echo "[trimmi-base] WARNING: uv not available; skipping aider install"
