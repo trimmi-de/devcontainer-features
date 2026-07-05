@@ -1,5 +1,18 @@
 # trimmi-de dev container features
 
+## Quick start
+
+```bash
+# 1. Clone any trimmi-de repo
+git clone <repo-url> && cd <repo>
+
+# 2. Open in VS Code with Dev Containers
+code .
+
+# 3. First time? Set up API keys on your host (one-time):
+#    See "Aider API keys" section below
+```
+
 The **one place** that keeps every `trimmi-de` repo's devcontainer from diverging.
 Shared tooling, env, extensions, and lifecycle scripts live here as a published
 [Dev Container Feature](https://containers.dev/implementors/features/); each repo's
@@ -43,6 +56,27 @@ Provides, in one versioned place:
 `src/trimmi-base/devcontainer-feature.json`, merge to `main`. The release workflow
 republishes the feature to GHCR; the **base-image** workflow then rebuilds the prebuilt
 image (below); repos pick it up on their next container rebuild.
+
+## Using Claude Code and aider inside the container
+
+Both tools are available on `PATH` as soon as the container starts.
+
+### Claude Code
+
+Run `claude` from the repo root. It reads its credentials from the host-mounted
+`~/.claude` directory (bind‑mounted read‑only). Project‑specific settings live in
+`.claude/settings.json` (committed to the repo). The shared `CLAUDE.md` at the repo
+root is automatically loaded as context.
+
+### Aider
+
+Run `aider` from the repo root. It loads API keys from the host‑mounted
+`~/.aider_env` file (bind‑mounted read‑only). The default model is DeepSeek
+(`AIDER_MODEL=deepseek`). To use OpenRouter, pass `--model openrouter/...` on the
+command line. The repo’s `CLAUDE.md` is injected as read‑only context via
+`AIDER_READ=CLAUDE.md`.
+
+See the **Aider API keys** section below for one‑time host setup.
 
 ## How consuming repos reference it — the prebuilt base image
 
@@ -94,7 +128,8 @@ A repo's own `.devcontainer/post-create.sh` shrinks to just its repo-specific st
 `.mcp.json` and `.claude/settings.json` remain committed per repo (they're
 project-scoped files Claude Code reads from the repo root, not container state).
 
-## Aider API keys (DeepSeek / OpenRouter)
+<details>
+<summary>Aider API keys (DeepSeek / OpenRouter) — click to expand</summary>
 
 aider is baked into the base image, but the API keys are **not** — they live in a host-mounted
 read-only `~/.aider_env` (same pattern as `~/.gh_token_env`), so keys never enter the image, git,
@@ -128,6 +163,8 @@ same way Claude Code reads its creds from the bind-mounted `~/.claude`). The def
 
 To rotate a key: revoke the old one in the provider dashboard, edit `~/.aider_env`, then restart the
 container (aider picks it up on next launch).
+
+</details>
 
 ## Local development
 

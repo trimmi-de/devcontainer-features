@@ -11,6 +11,12 @@ INSTALL_RTK="${INSTALLRTK:-true}"
 INSTALL_AIDER="${INSTALLAIDER:-true}"
 
 SHARE=/usr/local/share/trimmi
+# Determine the remote user's home directory dynamically
+if [ -n "${_REMOTE_USER:-}" ]; then
+    USER_HOME=$(getent passwd "$_REMOTE_USER" 2>/dev/null | cut -d: -f6) || USER_HOME="$HOME"
+else
+    USER_HOME="$HOME"
+fi
 mkdir -p "$SHARE"
 
 echo "[trimmi-base] installing (installRtk=${INSTALL_RTK})"
@@ -39,7 +45,7 @@ if [ "$INSTALL_RTK" = "true" ]; then
     if [ -n "$rtk_target" ] && [ -n "$rtk_tag" ]; then
         rtk_url="https://github.com/rtk-ai/rtk/releases/download/${rtk_tag}/rtk-${rtk_target}.tar.gz"
         echo "[trimmi-base] downloading prebuilt rtk ${rtk_tag} (${rtk_target})"
-        if curl -fsSL "$rtk_url" | tar -xz -C /usr/local/bin rtk; then
+        if curl -fsSL --retry 3 --retry-delay 5 "$rtk_url" | tar -xz -C /usr/local/bin rtk; then
             chmod 0755 /usr/local/bin/rtk
             rtk_installed=true
         else
@@ -50,12 +56,16 @@ if [ "$INSTALL_RTK" = "true" ]; then
     export PATH="/usr/local/cargo/bin:${CARGO_HOME:-/usr/local/cargo}/bin:${PATH}"
     if command -v cargo >/dev/null 2>&1; then
         if [ "$rtk_installed" != "true" ]; then
-            cargo install --locked --root /usr/local --git https://github.com/rtk-ai/rtk \
-                || echo "[trimmi-base] WARNING: rtk install failed (skipping)"
+            for i in 1 2 3; do
+                cargo install --locked --root /usr/local --git https://github.com/rtk-ai/rtk && break
+                sleep 1
+            done || echo "[trimmi-base] WARNING: rtk install failed after 3 attempts (skipping)"
         fi
         # rtk-mcp: no prebuilt binaries published — build from source.
-        cargo install --locked --root /usr/local --git https://github.com/ousamabenyounes/rtk-mcp \
-            || echo "[trimmi-base] WARNING: rtk-mcp install failed (skipping)"
+        for i in 1 2 3; do
+            cargo install --locked --root /usr/local --git https://github.com/ousamabenyounes/rtk-mcp && break
+            sleep 1
+        done || echo "[trimmi-base] WARNING: rtk-mcp install failed after 3 attempts (skipping)"
     else
         echo "[trimmi-base] WARNING: cargo not found — ensure the rust feature is present; skipping rtk-mcp"
     fi
@@ -63,21 +73,27 @@ fi
 
 # --- uv (provides uvx, used to run the serena MCP server; see each repo's .mcp.json) ---
 if ! command -v uv >/dev/null 2>&1; then
-    python3 -m pip install --no-cache-dir uv \
-        || echo "[trimmi-base] WARNING: uv install failed (ensure the python feature is present)"
+    curl -fsSL --retry 3 https://astral.sh/uv/install.sh | sh \
+        || echo "[trimmi-base] WARNING: uv install failed"
+    # Ensure uv is on PATH for subsequent commands
+    export PATH="$USER_HOME/.cargo/bin:$PATH"
 fi
 
 # --- aider (AI pair programming; DeepSeek default, OpenRouter available) -------
 # aider is a Python CLI with a heavy dep tree; install it isolated via uv tool
-# (uv installed above). Pin a uv-managed Python 3.12 — the dependency Python is
-# 3.14, too new for aider's deps. All install dirs live under /usr/local so the
-# binary, venv, and managed interpreter are baked in and on PATH for every user.
+# (uv installed above). Use the default Python (3.14) — aider works with it.
+# All install dirs live under /usr/local so the binary, venv, and managed
+# interpreter are baked in and on PATH for every user.
 if [ "$INSTALL_AIDER" = "true" ] && ! command -v aider >/dev/null 2>&1; then
-    export UV_TOOL_BIN_DIR=/usr/local/bin
-    export UV_TOOL_DIR=/usr/local/share/uv/tools
-    export UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python
-    uv tool install --python 3.12 aider-chat \
-        || echo "[trimmi-base] WARNING: aider install failed (ensure uv + network)"
+    if command -v uv >/dev/null 2>&1; then
+        export UV_TOOL_BIN_DIR=/usr/local/bin
+        export UV_TOOL_DIR=/usr/local/share/uv/tools
+        export UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python
+        uv tool install aider-chat \
+            || echo "[trimmi-base] WARNING: aider install failed (ensure uv + network)"
+    else
+        echo "[trimmi-base] WARNING: uv not available; skipping aider install"
+    fi
 fi
 
 # --- shared postStart: git identity + gh auth from the mounted token ----------
@@ -92,7 +108,7 @@ fi
 git config --global push.autoSetupRemote true
 # shellcheck source=/dev/null
 if [ -f "$HOME/.gh_token_env" ] && . "$HOME/.gh_token_env" && [ -n "${GH_TOKEN:-}" ]; then
-    if printf '%s' "$GH_TOKEN" | env -u GH_TOKEN gh auth login --with-token >/dev/null 2>&1; then
+    if printf '%s' "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1; then
         echo "gh authenticated from .gh_token_env"
     fi
 fi
@@ -115,7 +131,9 @@ echo "=== [trimmi] rtk global hook (telemetry left disabled) ==="
 # RTK_TELEMETRY_DISABLED=1 containerEnv (see devcontainer-feature.json) is the
 # hard kill-switch: it blocks all telemetry pings regardless of consent state.
 if command -v rtk >/dev/null 2>&1; then
-    printf 'n\n' | rtk init -g || echo "WARNING: rtk init failed"
+    # rtk init prompts once for telemetry consent ([y/N], default N). In a container
+    # build that prompt would block, so answer it non-interactively with N.
+    printf "n\n" | rtk init -g 2>/dev/null || echo "WARNING: rtk init failed"
     rtk telemetry disable >/dev/null 2>&1 || true
 else
     echo "WARNING: rtk init skipped (rtk not installed)"
