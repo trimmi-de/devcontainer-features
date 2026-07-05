@@ -8,6 +8,7 @@ set -euo pipefail
 
 # Feature options arrive as UPPERCASED env vars.
 INSTALL_RTK="${INSTALLRTK:-true}"
+INSTALL_AIDER="${INSTALLAIDER:-true}"
 
 SHARE=/usr/local/share/trimmi
 mkdir -p "$SHARE"
@@ -66,6 +67,19 @@ if ! command -v uv >/dev/null 2>&1; then
         || echo "[trimmi-base] WARNING: uv install failed (ensure the python feature is present)"
 fi
 
+# --- aider (AI pair programming; DeepSeek default, OpenRouter available) -------
+# aider is a Python CLI with a heavy dep tree; install it isolated via uv tool
+# (uv installed above). Pin a uv-managed Python 3.12 — the dependency Python is
+# 3.14, too new for aider's deps. All install dirs live under /usr/local so the
+# binary, venv, and managed interpreter are baked in and on PATH for every user.
+if [ "$INSTALL_AIDER" = "true" ] && ! command -v aider >/dev/null 2>&1; then
+    export UV_TOOL_BIN_DIR=/usr/local/bin
+    export UV_TOOL_DIR=/usr/local/share/uv/tools
+    export UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python
+    uv tool install --python 3.12 aider-chat \
+        || echo "[trimmi-base] WARNING: aider install failed (ensure uv + network)"
+fi
+
 # --- shared postStart: git identity + gh auth from the mounted token ----------
 install -m 0755 /dev/stdin "$SHARE/post-start.sh" <<'POSTSTART'
 #!/usr/bin/env bash
@@ -119,6 +133,25 @@ if ! grep -qF "$MARKER" "$HOME/.bashrc" 2>/dev/null; then
         echo '[ -f "$HOME/.gh_token_env" ] && . "$HOME/.gh_token_env"'
     } >> "$HOME/.bashrc"
 fi
+
+echo "=== [trimmi] wiring aider API keys + default model ==="
+# aider reads DEEPSEEK_API_KEY / OPENROUTER_API_KEY from the environment. The keys
+# live in a host-mounted read-only ~/.aider_env (same pattern as ~/.gh_token_env);
+# source it from ~/.bashrc so interactive shells get them. Idempotent via marker.
+AIDER_MARKER="# aider_env (devcontainer)"
+if ! grep -qF "$AIDER_MARKER" "$HOME/.bashrc" 2>/dev/null; then
+    {
+        echo ""
+        echo "$AIDER_MARKER"
+        # shellcheck disable=SC2016  # $HOME must stay literal: it expands when .bashrc is sourced
+        echo '[ -f "$HOME/.aider_env" ] && . "$HOME/.aider_env"'
+    } >> "$HOME/.bashrc"
+fi
+# Default model = deepseek. Don't clobber a user-provided config.
+if command -v aider >/dev/null 2>&1 && [ ! -f "$HOME/.aider.conf.yml" ]; then
+    printf 'model: deepseek\n' > "$HOME/.aider.conf.yml"
+fi
+
 echo "=== [trimmi] base post-create complete ==="
 POSTCREATE
 

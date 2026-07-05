@@ -4,7 +4,7 @@
 
 A **prebuilt image** that bakes the [`trimmi-base`](../src/trimmi-base) feature — and its
 whole dependency graph (python 3.14, github-cli, rust, claude-code) plus **rtk + rtk-mcp +
-uv** — into one published image. Consuming repos reference it via `image:` instead of
+uv + aider** — into one published image. Consuming repos reference it via `image:` instead of
 `features:`, so a container rebuild is a layer **pull** (seconds) with **zero** feature
 install — no per-rebuild `rtk-mcp` cargo compile.
 

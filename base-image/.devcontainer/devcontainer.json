@@ -4,7 +4,7 @@
     // `devcontainers/ci` builds this and publishes the result as
     // ghcr.io/trimmi-de/devcontainer-base. It bakes the trimmi-base feature
     // (and its dependsOn graph: python 3.14, github-cli, rust, claude-code) plus
-    // rtk + rtk-mcp + uv into one image — so consuming repos reference it via
+    // rtk + rtk-mcp + uv + aider into one image — so consuming repos reference it via
     // `image:` and skip the per-rebuild rtk-mcp compile entirely.
     //
     // App-specific features (docker-in-docker, node) are deliberately NOT baked
