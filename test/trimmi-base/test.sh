@@ -8,6 +8,9 @@ check "rtk on PATH"            bash -c "command -v rtk"
 check "rtk-mcp on PATH"        bash -c "command -v rtk-mcp"
 check "uv on PATH"             bash -c "command -v uv || command -v uvx"
 check "aider on PATH"          bash -c "command -v aider"
+check "AIDER_MODEL set"        bash -c '[ "$AIDER_MODEL" = "deepseek" ]'
+check "AIDER_ENV_FILE set"     bash -c '[ "$AIDER_ENV_FILE" = "/home/vscode/.aider_env" ]'
+check "AIDER_READ set"         bash -c '[ "$AIDER_READ" = "CLAUDE.md" ]'
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "CLAUDE_CONFIG_DIR set"  bash -c '[ "$CLAUDE_CONFIG_DIR" = "/home/vscode/.claude" ]'

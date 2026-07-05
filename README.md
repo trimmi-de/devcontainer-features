@@ -19,9 +19,13 @@ Provides, in one versioned place:
   Pin `rtk` with the `rtkVersion` option (default `latest`).
 - **uv** (provides `uvx`, used by each repo's `.mcp.json` to run the serena MCP server).
 - **aider** (AI pair programming) installed on PATH via `uv tool` (pinned to a uv-managed
-  Python 3.12, since the dependency Python is 3.14). Default model is **DeepSeek**
-  (`~/.aider.conf.yml` → `model: deepseek`); **OpenRouter** is usable ad-hoc via
-  `aider --model openrouter/...`. Keys come from a host-mounted `~/.aider_env` — see
+  Python 3.12, since the dependency Python is 3.14). Default model is **DeepSeek** via the
+  `AIDER_MODEL=deepseek` env; **OpenRouter** is usable ad-hoc via `aider --model openrouter/...`.
+  Keys come from a host-mounted `~/.aider_env` that aider loads itself (the `AIDER_ENV_FILE`
+  env points at it — same idea as Claude reading the bind-mounted `~/.claude`, no shell
+  sourcing). Each repo's **`CLAUDE.md` is loaded as read-only context** via `AIDER_READ=CLAUDE.md`,
+  so aider respects the same repo conventions Claude Code does — model-agnostically (it's injected
+  into the prompt; a repo without `CLAUDE.md` is silently skipped). See
   [Aider API keys](#aider-api-keys-deepseek--openrouter) below. Toggle with the
   `installAider` option (default `true`).
 - **Dependent features** pulled in automatically (`dependsOn`): `python` (3.14),
@@ -117,10 +121,13 @@ chmod 600 ~/.aider_env                       # re-assert owner-only in case umas
 
 Verify with `ls -l ~/.aider_env` → `-rw-------`. Keep this file in `$HOME`; never commit it or put
 it inside a repo working tree. The mount line above (`source=${localEnv:HOME}/.aider_env,...`) makes
-it available inside the container, and the shared `post-create.sh` sources it into interactive shells.
+it available inside the container; aider then loads it **itself** — the feature sets
+`AIDER_ENV_FILE=/home/vscode/.aider_env`, so no shell sourcing or generated config is involved (the
+same way Claude Code reads its creds from the bind-mounted `~/.claude`). The default model is set via
+`AIDER_MODEL=deepseek`. (`export ` on each line is fine — aider's dotenv parser tolerates it.)
 
 To rotate a key: revoke the old one in the provider dashboard, edit `~/.aider_env`, then restart the
-container (or `. ~/.aider_env`).
+container (aider picks it up on next launch).
 
 ## Local development
 

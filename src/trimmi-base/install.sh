@@ -134,23 +134,10 @@ if ! grep -qF "$MARKER" "$HOME/.bashrc" 2>/dev/null; then
     } >> "$HOME/.bashrc"
 fi
 
-echo "=== [trimmi] wiring aider API keys + default model ==="
-# aider reads DEEPSEEK_API_KEY / OPENROUTER_API_KEY from the environment. The keys
-# live in a host-mounted read-only ~/.aider_env (same pattern as ~/.gh_token_env);
-# source it from ~/.bashrc so interactive shells get them. Idempotent via marker.
-AIDER_MARKER="# aider_env (devcontainer)"
-if ! grep -qF "$AIDER_MARKER" "$HOME/.bashrc" 2>/dev/null; then
-    {
-        echo ""
-        echo "$AIDER_MARKER"
-        # shellcheck disable=SC2016  # $HOME must stay literal: it expands when .bashrc is sourced
-        echo '[ -f "$HOME/.aider_env" ] && . "$HOME/.aider_env"'
-    } >> "$HOME/.bashrc"
-fi
-# Default model = deepseek. Don't clobber a user-provided config.
-if command -v aider >/dev/null 2>&1 && [ ! -f "$HOME/.aider.conf.yml" ]; then
-    printf 'model: deepseek\n' > "$HOME/.aider.conf.yml"
-fi
+# aider gets its keys + default model without any wiring here: the feature's
+# containerEnv sets AIDER_ENV_FILE=/home/vscode/.aider_env (aider loads that
+# host-mounted dotenv itself) and AIDER_MODEL=deepseek. Same idea as Claude Code
+# reading its creds from the bind-mounted ~/.claude — nothing to source or write.
 
 echo "=== [trimmi] user-scope MCP servers (serena, rtk) ==="
 # Shared MCP servers live at USER scope so every trimmi repo gets them without

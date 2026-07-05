@@ -1,6 +1,6 @@
 {
     "id": "trimmi-base",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "name": "trimmi-de base dev environment",
     "description": "Shared dev-container setup for trimmi-de repos: rtk (Rust Token Killer) + rtk-mcp, aider (AI pair programming, DeepSeek default / OpenRouter via a host-mounted ~/.aider_env), gh auth from a host-mounted ~/.gh_token_env, Claude Code config, common VS Code extensions and env. Pulls in python 3.14, github-cli, rust, and claude-code as dependencies and ships the shared post-create/post-start lifecycle scripts.",
     "documentationURL": "https://github.com/trimmi-de/devcontainer-features/tree/main/src/trimmi-base",
@@ -24,7 +24,10 @@
     "containerEnv": {
         "EDITOR": "nano",
         "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
-        "RTK_TELEMETRY_DISABLED": "1"
+        "RTK_TELEMETRY_DISABLED": "1",
+        "AIDER_MODEL": "deepseek",
+        "AIDER_ENV_FILE": "/home/vscode/.aider_env",
+        "AIDER_READ": "CLAUDE.md"
     },
     "customizations": {
         "vscode": {
