@@ -119,7 +119,7 @@ fi
 git config --global push.autoSetupRemote true
 # shellcheck source=/dev/null
 if [ -f "$HOME/.gh_token_env" ] && . "$HOME/.gh_token_env" && [ -n "${GH_TOKEN:-}" ]; then
-    if printf '%s' "$GH_TOKEN" | env -u GH_TOKEN gh auth login --with-token >/dev/null 2>&1; then
+    if printf '%s' "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1; then
         echo "gh authenticated from .gh_token_env"
     fi
 fi
@@ -142,7 +142,9 @@ echo "=== [trimmi] rtk global hook (telemetry left disabled) ==="
 # RTK_TELEMETRY_DISABLED=1 containerEnv (see devcontainer-feature.json) is the
 # hard kill-switch: it blocks all telemetry pings regardless of consent state.
 if command -v rtk >/dev/null 2>&1; then
-    timeout 10 sh -c 'printf "n\n" | rtk init -g' || echo "WARNING: rtk init timed out or failed"
+    # rtk init prompts once for telemetry consent ([y/N], default N). In a container
+    # build that prompt would block, so answer it non-interactively with N.
+    printf "n\n" | rtk init -g 2>/dev/null || echo "WARNING: rtk init failed"
     rtk telemetry disable >/dev/null 2>&1 || true
 else
     echo "WARNING: rtk init skipped (rtk not installed)"

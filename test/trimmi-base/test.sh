@@ -23,6 +23,6 @@ check "EDITOR set"             bash -c '[ "$EDITOR" = "nano" ]'
 check "rtk telemetry off"      bash -c '[ "$RTK_TELEMETRY_DISABLED" = "1" ]'
 check "gh from dependency"     bash -c "command -v gh"
 check "cargo from dependency"  bash -c "command -v cargo || test -x /usr/local/cargo/bin/cargo"
-check "python 3.14 from dep"   bash -c "(python --version 2>&1; python3 --version 2>&1) | grep -q 'Python 3\.14'"
+check "python 3.14 from dep"   bash -c "(python --version 2>&1 || true; python3 --version 2>&1 || true) | grep -q 'Python 3\.14'"
 
 reportResults
