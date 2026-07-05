@@ -14,6 +14,7 @@ check "aider works"            bash -c "aider --help 2>&1 | head -5"
 check "AIDER_MODEL set"        bash -c '[ "$AIDER_MODEL" = "deepseek" ]'
 check "AIDER_ENV_FILE set"     bash -c '[ "$AIDER_ENV_FILE" = "/home/vscode/.aider_env" ]'
 check "AIDER_READ set"         bash -c '[ "$AIDER_READ" = "CLAUDE.md" ]'
+check "AIDER_AUTO_COMMITS off" bash -c '[ "$AIDER_AUTO_COMMITS" = "false" ]'
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "post-create runs"       bash -c "bash /usr/local/share/trimmi/post-create.sh"
