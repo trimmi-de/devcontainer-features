@@ -152,6 +152,24 @@ if command -v aider >/dev/null 2>&1 && [ ! -f "$HOME/.aider.conf.yml" ]; then
     printf 'model: deepseek\n' > "$HOME/.aider.conf.yml"
 fi
 
+echo "=== [trimmi] user-scope MCP servers (serena, rtk) ==="
+# Shared MCP servers live at USER scope so every trimmi repo gets them without
+# hardcoding them into each repo's project-scope .mcp.json (which stays app-owned).
+# Claude Code merges user + project scopes, so both are active at once. The config
+# dir (~/.claude) is bind-mounted from the host, so this writes host-globally —
+# accepted trade-off. remove-then-add is idempotent across rebuilds and also picks
+# up any change to a server's definition here.
+if command -v claude >/dev/null 2>&1; then
+    claude mcp remove --scope user serena >/dev/null 2>&1 || true
+    claude mcp add --scope user serena -- uvx --from git+https://github.com/oraios/serena \
+        serena start-mcp-server --context claude-code --project-from-cwd \
+        || echo "WARNING: serena mcp add failed"
+    claude mcp remove --scope user rtk >/dev/null 2>&1 || true
+    claude mcp add --scope user rtk -- rtk-mcp || echo "WARNING: rtk mcp add failed"
+else
+    echo "WARNING: claude not found; skipping user-scope MCP setup"
+fi
+
 echo "=== [trimmi] base post-create complete ==="
 POSTCREATE
 
