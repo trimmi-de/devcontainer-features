@@ -15,10 +15,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Publish features to ghcr.io/trimmi-de/devcontainer-features
-        uses: devcontainers/action@v1
+        # NOTE: devcontainers/action has no Node 24 release yet (v1.4.3 still
+        # targets node20), so GitHub's node20 deprecation warning persists for
+        # this step until upstream ships node24. Pinned to the newest v1.x.
+        uses: devcontainers/action@v1.4.3
         with:
           publish-features: "true"
           base-path-to-features: "./src"
