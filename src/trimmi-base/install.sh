@@ -183,6 +183,21 @@ else
     echo "WARNING: claude not found; skipping user-scope MCP setup"
 fi
 
+echo "=== [trimmi] Claude Code login persistence check ==="
+# Claude Code stores its authentication token in ~/.claude/credentials.json.
+# The ~/.claude directory is expected to be bind-mounted from the host (see
+# the feature's documentation). If the file is missing after a rebuild, the
+# user must run `/login` once inside the container. The bind mount ensures
+# the session persists across future rebuilds.
+if [ -f "$HOME/.claude/credentials.json" ]; then
+    echo "Claude Code credentials found – login should persist across rebuilds."
+else
+    echo "WARNING: ~/.claude/credentials.json not found."
+    echo "         Run '/login' inside Claude Code once to authenticate."
+    echo "         After that, the session will survive container rebuilds"
+    echo "         because ~/.claude is bind-mounted from the host."
+fi
+
 echo "=== [trimmi] base post-create complete ==="
 POSTCREATE
 

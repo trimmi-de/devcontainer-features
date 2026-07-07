@@ -19,6 +19,11 @@
             "type": "boolean",
             "default": true,
             "description": "Install aider (AI pair programming) via uv, with DeepSeek as the default model. API keys come from a host-mounted ~/.aider_env."
+        },
+        "claudeLogin": {
+            "type": "boolean",
+            "default": true,
+            "description": "Controls whether the feature attempts to restore Claude Code login automatically (currently a placeholder; the actual login must be done once via /login inside the container)."
         }
     },
     "containerEnv": {
