@@ -23,7 +23,7 @@ check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-sta
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "post-create runs"       bash -c "bash /usr/local/share/trimmi/post-create.sh"
 check "post-start runs"        bash -c "bash /usr/local/share/trimmi/post-start.sh"
-check "CLAUDE_CONFIG_DIR set"  bash -c '[ "$CLAUDE_CONFIG_DIR" = "/home/vscode/.claude" ]'
+check "CLAUDE_CONFIG_DIR set"  bash -c '[ "$CLAUDE_CONFIG_DIR" = "/home/vscode/.claude-local" ]'
 check "EDITOR set"             bash -c '[ "$EDITOR" = "nano" ]'
 check "rtk telemetry off"      bash -c '[ "$RTK_TELEMETRY_DISABLED" = "1" ]'
 check "gh from dependency"     bash -c "command -v gh"

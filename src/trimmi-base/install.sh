@@ -106,6 +106,47 @@ install -m 0755 /dev/stdin "$SHARE/post-start.sh" <<'POSTSTART'
 #!/usr/bin/env bash
 # Shared postStartCommand for trimmi-de repos. Runs on every start; never blocks.
 set -u
+
+# --- Claude Code per-container credential isolation ---------------------------
+# Every trimmi repo bind-mounts the host ~/.claude at /home/vscode/.claude, so the
+# host and all containers historically shared ONE ~/.claude/.credentials.json.
+# Claude Code refreshes its short-lived OAuth token in the background and rewrites
+# that file; with several containers running in parallel those refreshes clobber
+# each other and you get kicked back to `/login`.
+#
+# Fix: CLAUDE_CONFIG_DIR points at a container-local dir (see the feature's
+# containerEnv). Here we mirror every entry from the shared mount into it as a
+# symlink — so all config stays shared (CLAUDE.md, RTK.md, settings.json,
+# plugins/, and projects/ which holds the auto-memory) — EXCEPT .credentials.json,
+# which becomes a real per-container copy seeded from the host. Background token
+# refreshes inside a container then touch only its own copy, so sibling containers
+# are never invalidated. Log in on the host (or once here) and it propagates on the
+# next start; a refresh in one container no longer logs the others out.
+SHARED="$HOME/.claude"
+LOCAL="${CLAUDE_CONFIG_DIR:-$HOME/.claude-local}"
+if [ -d "$SHARED" ] && [ "$LOCAL" != "$SHARED" ]; then
+    mkdir -p "$LOCAL"
+    # Link entries not already present locally: never clobber something Claude has
+    # since written into the local dir, but do pick up new shared entries over time.
+    for src in "$SHARED"/* "$SHARED"/.[!.]*; do
+        [ -e "$src" ] || continue                       # guard unmatched globs
+        name="$(basename "$src")"
+        [ "$name" = ".credentials.json" ] && continue   # isolated below, never linked
+        if [ -e "$LOCAL/$name" ] || [ -L "$LOCAL/$name" ]; then continue; fi
+        ln -s "$src" "$LOCAL/$name"
+    done
+    # Credentials must be a real local file, never a symlink back to the shared
+    # mount (that would send background refreshes to the shared copy again).
+    [ -L "$LOCAL/.credentials.json" ] && rm -f "$LOCAL/.credentials.json"
+    # Seed / refresh from the shared master when the local copy is missing or the
+    # host's is newer (e.g. you just logged in on the host).
+    if [ -f "$SHARED/.credentials.json" ] && \
+       { [ ! -f "$LOCAL/.credentials.json" ] || [ "$SHARED/.credentials.json" -nt "$LOCAL/.credentials.json" ]; }; then
+        cp -p "$SHARED/.credentials.json" "$LOCAL/.credentials.json"
+        chmod 600 "$LOCAL/.credentials.json"
+    fi
+fi
+
 if [ -n "${HOST_GIT_USER:-}" ]; then
     git config --global user.name "$HOST_GIT_USER"
     git config --global user.email "${HOST_GIT_EMAIL:-}"
@@ -181,21 +222,6 @@ if command -v claude >/dev/null 2>&1; then
     claude mcp add --scope user rtk -- rtk-mcp || echo "WARNING: rtk mcp add failed"
 else
     echo "WARNING: claude not found; skipping user-scope MCP setup"
-fi
-
-echo "=== [trimmi] Claude Code login persistence check ==="
-# Claude Code stores its authentication token in ~/.claude/credentials.json.
-# The ~/.claude directory is expected to be bind-mounted from the host (see
-# the feature's documentation). If the file is missing after a rebuild, the
-# user must run `/login` once inside the container. The bind mount ensures
-# the session persists across future rebuilds.
-if [ -f "$HOME/.claude/credentials.json" ]; then
-    echo "Claude Code credentials found – login should persist across rebuilds."
-else
-    echo "WARNING: ~/.claude/credentials.json not found."
-    echo "         Run '/login' inside Claude Code once to authenticate."
-    echo "         After that, the session will survive container rebuilds"
-    echo "         because ~/.claude is bind-mounted from the host."
 fi
 
 echo "=== [trimmi] base post-create complete ==="
