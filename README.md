@@ -43,13 +43,16 @@ Provides, in one versioned place:
   `installAider` option (default `true`).
 - **Dependent features** pulled in automatically (`dependsOn`): `python` (3.14),
   `github-cli`, `rust`, `claude-code`.
-- **Shared env**: `EDITOR=nano`, `CLAUDE_CONFIG_DIR=/home/vscode/.claude`,
-  `RTK_TELEMETRY_DISABLED=1` (rtk telemetry off; the consent prompt is also answered
-  `N` non-interactively during install so the container build never blocks).
+- **Shared env**: `EDITOR=nano`, `CLAUDE_CONFIG_DIR=/home/vscode/.claude-local`
+  (a per-container Claude config dir seeded from the shared `~/.claude` mount — see
+  Claude Code section below), `RTK_TELEMETRY_DISABLED=1` (rtk telemetry off; the
+  consent prompt is also answered `N` non-interactively during install so the
+  container build never blocks).
 - **Shared VS Code extensions**: yaml, shellcheck, gitlens, markdown-all-in-one,
   GitHub PR. (Repo-type extras — the Python suite, ansible, etc. — go per repo.)
 - **Shared lifecycle scripts** installed to `/usr/local/share/trimmi/`:
-  - `post-start.sh` — git identity + `gh` auth from the mounted `~/.gh_token_env`.
+  - `post-start.sh` — git identity + `gh` auth from the mounted `~/.gh_token_env`,
+    plus Claude Code credential isolation (see below).
   - `post-create.sh` — `safe.directory`, `rtk init`, and GH_TOKEN shell wiring.
 
 **To change something everywhere:** edit this feature, bump `version` in
@@ -63,10 +66,21 @@ Both tools are available on `PATH` as soon as the container starts.
 
 ### Claude Code
 
-Run `claude` from the repo root. It reads its credentials from the host-mounted
-`~/.claude` directory (bind‑mounted read‑only). Project‑specific settings live in
-`.claude/settings.json` (committed to the repo). The shared `CLAUDE.md` at the repo
-root is automatically loaded as context.
+Run `claude` from the repo root. Log in once (on the host, or once inside any
+container) and it carries across rebuilds.
+
+**Credential isolation.** The host `~/.claude` is bind‑mounted at
+`/home/vscode/.claude` and shared by every repo and the host. But Claude actually
+runs against a per‑container `CLAUDE_CONFIG_DIR=/home/vscode/.claude-local`, which
+`post-start.sh` seeds on every start: it symlinks every entry from the shared mount
+(so `CLAUDE.md`, `settings.json`, `plugins/`, and `projects/` — including
+auto‑memory — stay shared) **except** `.credentials.json`, which is copied into a
+real per‑container file. Claude refreshes its short‑lived OAuth token in the
+background and rewrites that file; keeping it per‑container stops parallel
+containers from clobbering each other's token and kicking you back to `/login`. A
+fresh login on the host (newer file) propagates to each container on its next
+start. Project‑specific settings live in `.claude/settings.json` (committed to the
+repo); the shared `CLAUDE.md` at the repo root is loaded as context automatically.
 
 ### Aider
 
