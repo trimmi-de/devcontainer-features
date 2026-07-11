@@ -200,8 +200,10 @@ A repo's own `.devcontainer/post-create.sh` shrinks to just its repo-specific st
 `.mcp.json` and `.claude/settings.json` remain committed per repo (they're
 project-scoped files Claude Code reads from the repo root, not container state).
 
+### Aider API keys (DeepSeek / OpenRouter)
+
 <details>
-<summary>Aider API keys (DeepSeek / OpenRouter) — click to expand</summary>
+<summary>One-time host setup — click to expand</summary>
 
 aider is baked into the base image, but the API keys are **not** — they live in a host-mounted
 `~/.aider_env` (same pattern as `~/.gh_token_env`), so keys never enter the image or git. (These
