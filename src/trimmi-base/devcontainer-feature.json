@@ -29,7 +29,8 @@
         "AIDER_ENV_FILE": "/home/vscode/.aider_env",
         "AIDER_READ": "CLAUDE.md",
         "AIDER_AUTO_COMMITS": "false",
-        "AIDER_AUTO_MAIN_BRANCH": "false"
+        "AIDER_AUTO_MAIN_BRANCH": "false",
+        "AIDER_SHOW_RELEASE_NOTES": "false"
     },
     "customizations": {
         "vscode": {
