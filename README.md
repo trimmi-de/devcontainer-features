@@ -18,6 +18,59 @@ Shared tooling, env, extensions, and lifecycle scripts live here as a published
 [Dev Container Feature](https://containers.dev/implementors/features/); each repo's
 `devcontainer.json` stays a thin stub that references it.
 
+## Host machine prerequisites
+
+Everything tooling-related is baked into the base image — but a few things are **per-machine**
+and can't be: the container engine, and the host files the container bind-mounts for creds/config.
+Set these up **once per developer machine**.
+
+### 1. Container engine + Dev Containers tooling
+
+- **Docker** (Docker Desktop / Engine) **or Podman** — see the Podman notes below.
+- The **VS Code Dev Containers** extension and/or the `@devcontainers/cli`.
+- Access to pull `ghcr.io/trimmi-de/devcontainer-base:1` (if the package is private, run
+  `docker login ghcr.io` / `podman login ghcr.io` first).
+
+### 2. The four host paths (bind-mounted by the feature)
+
+The feature bind-mounts these from your `$HOME` into the container. They **must exist** on the
+host, or the mount misbehaves (Docker silently creates a **root-owned dir**, corrupting the two
+file mounts; rootless Podman hard-errors). The `initializeCommand` guard in each repo's
+`devcontainer.json` auto-creates empty ones so a container always comes up — but for the tools
+to actually authenticate, the two secret files need real content:
+
+| Host path | Type | Must contain | If empty/missing |
+| --- | --- | --- | --- |
+| `~/.claude/` | dir | Claude Code login/config (`.credentials.json`, `CLAUDE.md`, …) | Claude Code + aider run without your global memory/creds |
+| `~/.serena/` | dir | serena MCP state (auto-managed) | recreated empty; no shared state |
+| `~/.aider_env` | file | `export DEEPSEEK_API_KEY=…` and `export OPENROUTER_API_KEY=…` | aider runs **keyless** (no crash; warnings suppressed) |
+| `~/.gh_token_env` | file | `export GH_TOKEN=…` (a GitHub PAT) | `gh` stays logged out (post-start guards on `$GH_TOKEN`) |
+
+See [Aider API keys](#aider-api-keys-deepseek--openrouter) for the exact `~/.aider_env` recipe.
+`~/.gh_token_env` follows the same shape. Nothing here is baked into the image or committed to
+git — the secrets never leave your machine.
+
+### 3. Optional host env vars
+
+`GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` on the host feed the container's git identity (via
+`remoteEnv` → `HOST_GIT_USER` / `HOST_GIT_EMAIL`). Absent → git identity just isn't preset.
+
+### Running Podman instead of Docker
+
+It works, with extra setup:
+
+- **Point the tooling at Podman** — VS Code `dev.containers.dockerPath: "podman"` (+ compose path),
+  or `--docker-path podman` for the CLI; a running `podman system service` socket.
+- **SELinux hosts (Fedora/RHEL/…)** — bind mounts aren't readable inside the container without a
+  relabel, which surfaces as "key not set" again. The feature mounts don't add `:z`/`:Z`, so add
+  `--security-opt label=disable` (or relabel) via `runArgs`.
+- **Rootless UID mapping** — mounted files are owned by your host UID; without
+  `runArgs: ["--userns=keep-id"]` they can appear unreadable inside the container.
+- **The `initializeCommand` guard matters more** — rootless Podman hard-errors on a missing bind
+  source (vs Docker's silent root-owned dir), so the guard is what keeps `up` working at all.
+- **docker-in-docker is shaky rootless** — only relevant to *this* feature-dev repo (it needs dind
+  to run `devcontainer features test`); normal app repos don't use it.
+
 ## Features
 
 ### `trimmi-base`
@@ -36,9 +89,10 @@ Provides, in one versioned place:
   `AIDER_MODEL=deepseek` env; **OpenRouter** is usable ad-hoc via `aider --model openrouter/...`.
   Keys come from a host-mounted `~/.aider_env` that aider loads itself (the `AIDER_ENV_FILE`
   env points at it — same idea as Claude reading the bind-mounted `~/.claude`, no shell
-  sourcing). Each repo's **`CLAUDE.md` is loaded as read-only context** via `AIDER_READ=CLAUDE.md`,
-  so aider respects the same repo conventions Claude Code does — model-agnostically (it's injected
-  into the prompt; a repo without `CLAUDE.md` is silently skipped). See
+  sourcing). The shared global **`CLAUDE.md` is loaded as read-only context** via
+  `AIDER_READ=/home/vscode/.claude/CLAUDE.md` (the same file Claude Code reads as user memory),
+  so aider follows the same instructions Claude Code does — model-agnostically (it's injected
+  into the prompt; if the file is absent it's silently skipped). See
   [Aider API keys](#aider-api-keys-deepseek--openrouter) below. Toggle with the
   `installAider` option (default `true`).
 - **Dependent features** pulled in automatically (`dependsOn`): `python` (3.14),
@@ -85,10 +139,10 @@ repo); the shared `CLAUDE.md` at the repo root is loaded as context automaticall
 ### Aider
 
 Run `aider` from the repo root. It loads API keys from the host‑mounted
-`~/.aider_env` file (bind‑mounted read‑only). The default model is DeepSeek
+`~/.aider_env` file. The default model is DeepSeek
 (`AIDER_MODEL=deepseek`). To use OpenRouter, pass `--model openrouter/...` on the
-command line. The repo’s `CLAUDE.md` is injected as read‑only context via
-`AIDER_READ=CLAUDE.md`.
+command line. The shared global `CLAUDE.md` is injected as read‑only context via
+`AIDER_READ=/home/vscode/.claude/CLAUDE.md`.
 
 See the **Aider API keys** section below for one‑time host setup.
 
@@ -150,8 +204,10 @@ project-scoped files Claude Code reads from the repo root, not container state).
 <summary>Aider API keys (DeepSeek / OpenRouter) — click to expand</summary>
 
 aider is baked into the base image, but the API keys are **not** — they live in a host-mounted
-read-only `~/.aider_env` (same pattern as `~/.gh_token_env`), so keys never enter the image, git,
-or the container's writable layer. Do this **once per developer machine** (on the host):
+`~/.aider_env` (same pattern as `~/.gh_token_env`), so keys never enter the image or git. (These
+two file mounts were read-only until trimmi-base 1.5.1; the feature Mount schema has no `readonly`
+property, so they now mount read-write — the container can write the host file, but the keys still
+never leave your machine.) Do this **once per developer machine** (on the host):
 
 **1. Get a DeepSeek API key** — sign in at <https://platform.deepseek.com/> → **API keys** →
 **Create new API key**. Copy it immediately (shown once); it looks like `sk-...`. DeepSeek is
@@ -173,8 +229,8 @@ chmod 600 ~/.aider_env                       # re-assert owner-only in case umas
 ```
 
 Verify with `ls -l ~/.aider_env` → `-rw-------`. Keep this file in `$HOME`; never commit it or put
-it inside a repo working tree. The mount line above (`source=${localEnv:HOME}/.aider_env,...`) makes
-it available inside the container; aider then loads it **itself** — the feature sets
+it inside a repo working tree. The feature-provided bind mount (baked into the base image as of
+1.5.1) makes it available inside the container; aider then loads it **itself** — the feature sets
 `AIDER_ENV_FILE=/home/vscode/.aider_env`, so no shell sourcing or generated config is involved (the
 same way Claude Code reads its creds from the bind-mounted `~/.claude`). The default model is set via
 `AIDER_MODEL=deepseek`. (`export ` on each line is fine — aider's dotenv parser tolerates it.)

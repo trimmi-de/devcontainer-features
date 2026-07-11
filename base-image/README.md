@@ -27,7 +27,12 @@ infra doesn't need them); consumers add those on top via their own `features:` b
         "ghcr.io/devcontainers/features/node:1": { "version": "20" }
     },
 
-    "mounts": [ /* host bind-mounts, per repo */ ],
+    // host bind-mounts (~/.claude, ~/.serena, ~/.gh_token_env, ~/.aider_env) are
+    // baked into the base image by trimmi-base >=1.5.1 — no per-repo "mounts" block.
+    // But keep this host-side guard: a missing bind source corrupts the file mounts
+    // (Docker makes a root-owned dir) / hard-errors (rootless Podman). A feature
+    // cannot contribute initializeCommand, so every repo needs this one line.
+    "initializeCommand": "mkdir -p ~/.claude ~/.serena && touch ~/.aider_env ~/.gh_token_env",
     "remoteEnv": { "HOST_GIT_USER": "${localEnv:GIT_AUTHOR_NAME}", "HOST_GIT_EMAIL": "${localEnv:GIT_AUTHOR_EMAIL}" },
     "postStartCommand": "bash /usr/local/share/trimmi/post-start.sh",
     "postCreateCommand": "bash /usr/local/share/trimmi/post-create.sh && bash .devcontainer/post-create.sh"
