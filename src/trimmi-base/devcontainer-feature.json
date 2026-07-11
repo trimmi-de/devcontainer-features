@@ -34,10 +34,10 @@
         "AIDER_SHOW_MODEL_WARNINGS": "false"
     },
     "mounts": [
-        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
-        "source=${localEnv:HOME}/.serena,target=/home/vscode/.serena,type=bind",
-        "source=${localEnv:HOME}/.gh_token_env,target=/home/vscode/.gh_token_env,type=bind,readonly",
-        "source=${localEnv:HOME}/.aider_env,target=/home/vscode/.aider_env,type=bind,readonly"
+        { "source": "${localEnv:HOME}/.claude", "target": "/home/vscode/.claude", "type": "bind" },
+        { "source": "${localEnv:HOME}/.serena", "target": "/home/vscode/.serena", "type": "bind" },
+        { "source": "${localEnv:HOME}/.gh_token_env", "target": "/home/vscode/.gh_token_env", "type": "bind" },
+        { "source": "${localEnv:HOME}/.aider_env", "target": "/home/vscode/.aider_env", "type": "bind" }
     ],
     "customizations": {
         "vscode": {
