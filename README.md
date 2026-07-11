@@ -114,13 +114,17 @@ layer **pull** with **zero** feature install — no per-rebuild `rtk-mcp` cargo 
         "ghcr.io/devcontainers/features/node:1": { "version": "20" }
     },
 
-    // host bind-mounts stay per repo (they reference ${localEnv:HOME})
-    "mounts": [
-        { "source": "${localEnv:HOME}/.claude", "target": "/home/vscode/.claude", "type": "bind" },
-        { "source": "${localEnv:HOME}/.serena", "target": "/home/vscode/.serena", "type": "bind" },
-        "source=${localEnv:HOME}/.gh_token_env,target=/home/vscode/.gh_token_env,type=bind,readonly",
-        "source=${localEnv:HOME}/.aider_env,target=/home/vscode/.aider_env,type=bind,readonly"
-    ],
+    // As of trimmi-base 1.5.1 the four host bind-mounts (~/.claude, ~/.serena,
+    // ~/.gh_token_env, ~/.aider_env) are baked into the base image by the feature
+    // — consuming repos no longer declare a `mounts` block for them.
+    //
+    // But every repo MUST keep this one host-side guard: a missing bind source
+    // makes Docker/Podman silently create a root-owned dir that corrupts the
+    // dotenv file mounts. initializeCommand runs on the host before create (a
+    // feature cannot contribute it), so it can't be centralized. Empty
+    // placeholders degrade gracefully — no key just means aider/gh stay
+    // unauthenticated.
+    "initializeCommand": "mkdir -p ~/.claude ~/.serena && touch ~/.aider_env ~/.gh_token_env",
 
     "remoteEnv": {
         "HOST_GIT_USER": "${localEnv:GIT_AUTHOR_NAME}",
@@ -187,13 +191,91 @@ npm install -g @devcontainers/cli
 devcontainer features test -f trimmi-base -i mcr.microsoft.com/devcontainers/base:ubuntu-24.04 .
 ```
 
-## Publishing
+## Releasing a change end-to-end (the two-step)
 
-`.github/workflows/release.yml` publishes to GHCR on push to `main` (uses the
-in-Actions `GITHUB_TOKEN`, which has `packages: write`). To publish by hand you need a
-PAT with `write:packages`:
+There are **two separately-published artifacts**, and consuming repos reference only the
+second one:
+
+1. **The feature** — `ghcr.io/trimmi-de/devcontainer-features/trimmi-base` — published by
+   [`release.yml`](.github/workflows/release.yml).
+2. **The prebuilt base image** — `ghcr.io/trimmi-de/devcontainer-base` — published by
+   [`release-base-image.yml`](.github/workflows/release-base-image.yml), built from the
+   **committed lock** (`base-image/.devcontainer/devcontainer-lock.json`).
+
+Consuming repos pin `image: ghcr.io/trimmi-de/devcontainer-base:1` — **not** the feature. So
+a feature change reaches them **only after the base image is rebuilt against the new feature
+version**. Publishing the feature alone changes nothing downstream. This is the two-step, and
+skipping step 2 is the classic "my fix silently never shipped" trap.
+
+### Step 0 — make + prove the change (in a PR)
+
+1. Edit `src/trimmi-base/` (`install.sh`, `devcontainer-feature.json`, lifecycle scripts).
+2. **Bump `version`** in `src/trimmi-base/devcontainer-feature.json` — patch for a fix, minor
+   for a feature. *No bump = the publish is a no-op and the lock can never move.* Check the
+   real current version against the **registry**, not git tags (tags here are unreliable):
+   ```bash
+   PKG=trimmi-de/devcontainer-features/trimmi-base
+   TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:$PKG:pull" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+   curl -s -H "Authorization: Bearer $TOKEN" "https://ghcr.io/v2/$PKG/tags/list" | tr ',' '\n' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail
+   ```
+3. Update `test/trimmi-base/test.sh` assertions to match, and run the test locally:
+   ```bash
+   devcontainer features test -f trimmi-base -i mcr.microsoft.com/devcontainers/base:ubuntu-24.04 .
+   ```
+4. Open the PR, review, merge to `main`.
+
+### Step 1 — publish the feature
+
+Merging any `src/**` change to `main` triggers `release.yml`, which publishes
+`trimmi-base:X.Y.Z` (plus the moving `:X.Y`, `:X`, `:latest` tags) to GHCR via the in-Actions
+`GITHUB_TOKEN`. **Wait for that workflow to go green, then confirm the new version is live in
+the registry** (rerun the tag-list command above — you should see your `X.Y.Z`). Step 2 reads
+the live registry, so it must actually be published first.
+
+<details><summary>Publish the feature by hand (rarely needed — needs a PAT with <code>write:packages</code>)</summary>
 
 ```bash
 echo "$PAT" | docker login ghcr.io -u trimmi-de --password-stdin
 devcontainer features publish ./src --namespace trimmi-de/devcontainer-features
 ```
+</details>
+
+### Step 2 — refresh the base-image lock and rebuild
+
+The base image builds from the committed lock, so it keeps shipping the **old** pinned
+feature until you deliberately re-resolve it. Do **not** hand-edit the lock (the digest only
+exists post-publish) — let the CLI resolve it against the registry:
+
+```bash
+devcontainer upgrade --workspace-folder base-image     # re-resolves trimmi-base:1 -> X.Y.Z + new digest
+git add base-image/.devcontainer/devcontainer-lock.json
+git commit -m "Refresh base-image lock to trimmi-base X.Y.Z"
+git push                                                # commit the lock via a PR to main
+```
+
+Confirm the diff actually bumped `trimmi-base` to `X.Y.Z` with a new digest. Merging this
+`base-image/**` change triggers `release-base-image.yml`, which rebuilds and republishes
+`ghcr.io/trimmi-de/devcontainer-base:1` + `:latest`. **If the version in the lock didn't
+change, `devcontainer upgrade` silently re-resolved to the old version — that means step 1
+hadn't published yet.**
+
+### Step 3 — consuming repos pick it up
+
+Because repos pin the moving tag `devcontainer-base:1`, the next **container rebuild** pulls
+the new image:
+
+- VS Code: **Dev Containers: Rebuild Container** (use *Rebuild Without Cache* / pull if a
+  stale image is cached).
+- Each consuming repo also needs, **one time**, the host-side pieces a feature cannot bake in
+  (see [How consuming repos reference it](#how-consuming-repos-reference-it--the-prebuilt-base-image)):
+  the `initializeCommand` guard line, and the host files (`~/.aider_env`, `~/.gh_token_env`,
+  `~/.claude`, `~/.serena`) — populated with real secrets for aider/gh to authenticate.
+
+### At a glance
+
+| Step | You do | Trigger | Publishes / result |
+| --- | --- | --- | --- |
+| 0 | Edit `src/`, **bump `version`**, update tests | — | local test green |
+| 1 | Merge `src/**` to `main` | `release.yml` | `trimmi-base:X.Y.Z` in GHCR |
+| 2 | `devcontainer upgrade` on `base-image`, commit lock | `release-base-image.yml` | `devcontainer-base:1` rebuilt on X.Y.Z |
+| 3 | Rebuild container in each repo | — | change is live downstream |
