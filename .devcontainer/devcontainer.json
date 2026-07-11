@@ -18,13 +18,23 @@
 
     // Host bind-mounts: shared tooling reads its creds/config from these (Claude
     // from ~/.claude, gh from ~/.gh_token_env, aider from ~/.aider_env, serena
-    // state from ~/.serena). Same set every trimmi-de repo mounts.
+    // state from ~/.serena). As of trimmi-base 1.5.1 the FEATURE declares these
+    // mounts, so consuming repos no longer need this block — it stays here only
+    // until the base image is rebuilt on 1.5.1 (removing it now would strip the
+    // mounts while this repo still runs the pre-1.5.1 image).
     "mounts": [
         { "source": "${localEnv:HOME}/.claude", "target": "/home/vscode/.claude", "type": "bind" },
         { "source": "${localEnv:HOME}/.serena", "target": "/home/vscode/.serena", "type": "bind" },
         "source=${localEnv:HOME}/.gh_token_env,target=/home/vscode/.gh_token_env,type=bind,readonly",
         "source=${localEnv:HOME}/.aider_env,target=/home/vscode/.aider_env,type=bind,readonly"
     ],
+
+    // Self-healing guard: a missing bind source makes Docker silently create a
+    // root-owned dir (which corrupts the dotenv file mounts). Ensure the paths
+    // exist on the host BEFORE create. initializeCommand runs host-side, which a
+    // feature cannot contribute — so every consuming repo needs this one line.
+    // Empty placeholders degrade gracefully: no key -> aider/gh stay unauthenticated.
+    "initializeCommand": "mkdir -p ~/.claude ~/.serena && touch ~/.aider_env ~/.gh_token_env",
 
     "remoteEnv": {
         "HOST_GIT_USER": "${localEnv:GIT_AUTHOR_NAME}",

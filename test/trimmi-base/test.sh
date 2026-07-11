@@ -17,8 +17,9 @@ check "aider on PATH"          bash -c "command -v aider"
 check "aider works"            bash -c "aider --version"
 check "AIDER_MODEL set"        bash -c '[ "$AIDER_MODEL" = "deepseek" ]'
 check "AIDER_ENV_FILE set"     bash -c '[ "$AIDER_ENV_FILE" = "/home/vscode/.aider_env" ]'
-check "AIDER_READ set"         bash -c '[ "$AIDER_READ" = "CLAUDE.md" ]'
+check "AIDER_READ set"         bash -c '[ "$AIDER_READ" = "/home/vscode/.claude/CLAUDE.md" ]'
 check "AIDER_AUTO_COMMITS off" bash -c '[ "$AIDER_AUTO_COMMITS" = "false" ]'
+check "AIDER_MODEL_WARN off"   bash -c '[ "$AIDER_SHOW_MODEL_WARNINGS" = "false" ]'
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "post-create runs"       bash -c "bash /usr/local/share/trimmi/post-create.sh"
