@@ -40,6 +40,9 @@ expect_env = {
     "AIDER_MODEL": "deepseek",
     "AIDER_ENV_FILE": "/home/vscode/.aider_env",
     "AIDER_READ": "/home/vscode/.claude/CLAUDE.md",
+    "AIDER_ANALYTICS_DISABLE": "true",   # no analytics opt-in prompt at startup
+    "AIDER_GITIGNORE": "false",          # no ".gitignore?" prompt at startup
+    "AIDER_CHECK_UPDATE": "false",       # no update-check nag at startup
 }
 for k, v in expect_env.items():
     if env.get(k) != v:

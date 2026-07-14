@@ -1,5 +1,29 @@
 # Releasing — the two-step process (read this every time)
 
+## Tests run automatically before every push (one-time setup)
+
+The tests (Claude login, aider login, gh token, and all four host mounts) are wired to run
+**before every `git push`** via a git hook. Each clone must turn it on **once**:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+After that, `git push` automatically runs, in order: shell syntax → `test/validate-metadata.sh`
+(checks all four mounts + env are declared) → the full container test suite
+(`devcontainer features test`). If anything fails, the push is blocked. This needs Docker and
+the `@devcontainers/cli` available locally.
+
+A server-side backstop (`.github/workflows/test.yml`) runs the same tests on every push/PR to
+GitHub, so nothing broken reaches `main` even if the local hook is skipped. **Do not push with
+`--no-verify`** except in a genuine emergency.
+
+There is also a heavier, on-demand runtime check that launches serena and proves its web
+dashboard never comes up: `bash test/serena-dashboard-check.sh` (not part of the gate — it
+fetches + starts serena over the network).
+
+---
+
 This repo publishes **two separate things** to the GitHub Container Registry (GHCR):
 
 1. **The feature** — `ghcr.io/trimmi-de/devcontainer-features/trimmi-base`
