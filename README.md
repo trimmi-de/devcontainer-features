@@ -31,13 +31,15 @@ Set these up **once per developer machine**.
 - Access to pull `ghcr.io/trimmi-de/devcontainer-base:1` (if the package is private, run
   `docker login ghcr.io` / `podman login ghcr.io` first).
 
-### 2. The four host paths (bind-mounted by the feature)
+### 2. The four host paths (bind-mounted from `$HOME`)
 
-The feature bind-mounts these from your `$HOME` into the container. They **must exist** on the
-host, or the mount misbehaves (Docker silently creates a **root-owned dir**, corrupting the two
-file mounts; rootless Podman hard-errors). The `initializeCommand` guard in each repo's
-`devcontainer.json` auto-creates empty ones so a container always comes up — but for the tools
-to actually authenticate, the two secret files need real content:
+Each repo's `devcontainer.json` bind-mounts these from your `$HOME` into the container (the
+feature declares them too as a fallback, but keep the per-repo `mounts` block — see the
+consuming-repo template below for why). They **must exist** on the host, or the mount misbehaves
+(Docker silently creates a **root-owned dir**, corrupting the two file mounts; rootless Podman
+hard-errors). The `initializeCommand` guard in each repo's `devcontainer.json` auto-creates empty
+ones so a container always comes up — but for the tools to actually authenticate, the two secret
+files need real content:
 
 | Host path | Type | Must contain | If empty/missing |
 | --- | --- | --- | --- |
@@ -168,16 +170,27 @@ layer **pull** with **zero** feature install — no per-rebuild `rtk-mcp` cargo 
         "ghcr.io/devcontainers/features/node:1": { "version": "20" }
     },
 
-    // As of trimmi-base 1.5.1 the four host bind-mounts (~/.claude, ~/.serena,
-    // ~/.gh_token_env, ~/.aider_env) are baked into the base image by the feature
-    // — consuming repos no longer declare a `mounts` block for them.
-    //
-    // But every repo MUST keep this one host-side guard: a missing bind source
+    // The four host bind-mounts (~/.claude, ~/.serena, ~/.gh_token_env,
+    // ~/.aider_env). trimmi-base declares these in the feature metadata too, but
+    // KEEP this per-repo block: image-metadata mounts don't resolve ${localEnv:HOME}
+    // consistently under VS Code + WSL, so relying on the baked ones alone can leave
+    // these paths unmounted — Claude logged out, aider keyless, gh no token. A
+    // repo-declared mount always substitutes ${localEnv:HOME} against the local env,
+    // and duplicating the feature mounts is safe (the CLI dedups by target).
+    "mounts": [
+        { "source": "${localEnv:HOME}/.claude",       "target": "/home/vscode/.claude",       "type": "bind" },
+        { "source": "${localEnv:HOME}/.serena",       "target": "/home/vscode/.serena",       "type": "bind" },
+        { "source": "${localEnv:HOME}/.gh_token_env", "target": "/home/vscode/.gh_token_env", "type": "bind" },
+        { "source": "${localEnv:HOME}/.aider_env",    "target": "/home/vscode/.aider_env",    "type": "bind" }
+    ],
+
+    // And every repo MUST keep this one host-side guard: a missing bind source
     // makes Docker/Podman silently create a root-owned dir that corrupts the
     // dotenv file mounts. initializeCommand runs on the host before create (a
     // feature cannot contribute it), so it can't be centralized. Empty
     // placeholders degrade gracefully — no key just means aider/gh stay
-    // unauthenticated.
+    // unauthenticated. WSL: open via Remote-WSL (so ~ is your WSL home, where the
+    // dotfiles live) before Reopen in Container, or the mounts hit the wrong home.
     "initializeCommand": "mkdir -p ~/.claude ~/.serena && touch ~/.aider_env ~/.gh_token_env",
 
     "remoteEnv": {
