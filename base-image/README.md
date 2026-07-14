@@ -27,11 +27,24 @@ infra doesn't need them); consumers add those on top via their own `features:` b
         "ghcr.io/devcontainers/features/node:1": { "version": "20" }
     },
 
-    // host bind-mounts (~/.claude, ~/.serena, ~/.gh_token_env, ~/.aider_env) are
-    // baked into the base image by trimmi-base >=1.5.1 — no per-repo "mounts" block.
-    // But keep this host-side guard: a missing bind source corrupts the file mounts
+    // Host bind-mounts. trimmi-base >=1.5.1 also declares these in the feature so
+    // they ride in the base-image metadata, BUT keep this per-repo block: only a
+    // repo-declared mount gets ${localEnv:HOME} substituted against the local (incl.
+    // WSL) environment reliably by every client — image-metadata mounts do not resolve
+    // consistently under VS Code + WSL, so relying on them alone leaves ~/.claude,
+    // ~/.aider_env, ~/.gh_token_env unmounted (Claude logged out, aider has no key, gh
+    // no token). Duplicating the feature mounts is safe: the CLI dedups by target.
+    "mounts": [
+        { "source": "${localEnv:HOME}/.claude",       "target": "/home/vscode/.claude",       "type": "bind" },
+        { "source": "${localEnv:HOME}/.serena",       "target": "/home/vscode/.serena",       "type": "bind" },
+        { "source": "${localEnv:HOME}/.gh_token_env", "target": "/home/vscode/.gh_token_env", "type": "bind" },
+        { "source": "${localEnv:HOME}/.aider_env",    "target": "/home/vscode/.aider_env",    "type": "bind" }
+    ],
+    // And keep this host-side guard: a missing bind source corrupts the file mounts
     // (Docker makes a root-owned dir) / hard-errors (rootless Podman). A feature
     // cannot contribute initializeCommand, so every repo needs this one line.
+    // WSL note: open the folder via Remote-WSL (so ~ is your WSL home, where these
+    // dotfiles live) before Reopen in Container, or the mounts resolve to the wrong home.
     "initializeCommand": "mkdir -p ~/.claude ~/.serena && touch ~/.aider_env ~/.gh_token_env",
     "remoteEnv": { "HOST_GIT_USER": "${localEnv:GIT_AUTHOR_NAME}", "HOST_GIT_EMAIL": "${localEnv:GIT_AUTHOR_EMAIL}" },
     "postStartCommand": "bash /usr/local/share/trimmi/post-start.sh",

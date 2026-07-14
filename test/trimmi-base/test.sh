@@ -22,6 +22,8 @@ check "AIDER_AUTO_COMMITS off" bash -c '[ "$AIDER_AUTO_COMMITS" = "false" ]'
 check "AIDER_MODEL_WARN off"   bash -c '[ "$AIDER_SHOW_MODEL_WARNINGS" = "false" ]'
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
+check "shared claude-isolate"  bash -c "test -x /usr/local/share/trimmi/claude-isolate.sh"
+check "claude-isolate runs"    bash -c "bash /usr/local/share/trimmi/claude-isolate.sh"
 check "post-create runs"       bash -c "bash /usr/local/share/trimmi/post-create.sh"
 check "post-start runs"        bash -c "bash /usr/local/share/trimmi/post-start.sh"
 check "CLAUDE_CONFIG_DIR set"  bash -c '[ "$CLAUDE_CONFIG_DIR" = "/home/vscode/.claude-local" ]'

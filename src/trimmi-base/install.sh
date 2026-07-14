@@ -101,13 +101,18 @@ if [ "$INSTALL_AIDER" = "true" ] && ! command -v aider >/dev/null 2>&1; then
     fi
 fi
 
-# --- shared postStart: git identity + gh auth from the mounted token ----------
-install -m 0755 /dev/stdin "$SHARE/post-start.sh" <<'POSTSTART'
+# --- shared Claude Code credential + login isolation --------------------------
+# Factored into its own script so BOTH post-create (before `claude mcp add`) and
+# post-start (credential refresh on every start) can call it. Ordering is the
+# whole point: devcontainer runs postCreate before postStart, and post-create's
+# `claude mcp add` writes $CLAUDE_CONFIG_DIR/.claude.json. If that fresh file is
+# created before the host's logged-in .claude.json is seeded, the container comes
+# up with MCP servers but no oauthAccount -> "not logged in". So this runs first.
+install -m 0755 /dev/stdin "$SHARE/claude-isolate.sh" <<'ISOLATE'
 #!/usr/bin/env bash
-# Shared postStartCommand for trimmi-de repos. Runs on every start; never blocks.
-set -u
-
-# --- Claude Code per-container credential isolation ---------------------------
+# Claude Code per-container credential + login isolation. Idempotent; safe to run
+# repeatedly and from multiple lifecycle hooks.
+#
 # Every trimmi repo bind-mounts the host ~/.claude at /home/vscode/.claude, so the
 # host and all containers historically shared ONE ~/.claude/.credentials.json.
 # Claude Code refreshes its short-lived OAuth token in the background and rewrites
@@ -115,37 +120,64 @@ set -u
 # each other and you get kicked back to `/login`.
 #
 # Fix: CLAUDE_CONFIG_DIR points at a container-local dir (see the feature's
-# containerEnv). Here we mirror every entry from the shared mount into it as a
-# symlink — so all config stays shared (CLAUDE.md, RTK.md, settings.json,
-# plugins/, and projects/ which holds the auto-memory) — EXCEPT .credentials.json,
-# which becomes a real per-container copy seeded from the host. Background token
-# refreshes inside a container then touch only its own copy, so sibling containers
-# are never invalidated. Log in on the host (or once here) and it propagates on the
-# next start; a refresh in one container no longer logs the others out.
+# containerEnv). We mirror every entry from the shared mount into it as a symlink
+# -- so all config stays shared (CLAUDE.md, RTK.md, settings.json, plugins/, and
+# projects/ which holds the auto-memory) -- EXCEPT the two files that carry
+# per-container identity, handled as real seeded copies below:
+#   .credentials.json  short-lived OAuth token (refreshed when the host's is newer)
+#   .claude.json       login account (oauthAccount/userID) + evolving MCP/project state
+set -u
 SHARED="$HOME/.claude"
 LOCAL="${CLAUDE_CONFIG_DIR:-$HOME/.claude-local}"
-if [ -d "$SHARED" ] && [ "$LOCAL" != "$SHARED" ]; then
-    mkdir -p "$LOCAL"
-    # Link entries not already present locally: never clobber something Claude has
-    # since written into the local dir, but do pick up new shared entries over time.
-    for src in "$SHARED"/* "$SHARED"/.[!.]*; do
-        [ -e "$src" ] || continue                       # guard unmatched globs
-        name="$(basename "$src")"
-        [ "$name" = ".credentials.json" ] && continue   # isolated below, never linked
-        if [ -e "$LOCAL/$name" ] || [ -L "$LOCAL/$name" ]; then continue; fi
-        ln -s "$src" "$LOCAL/$name"
-    done
-    # Credentials must be a real local file, never a symlink back to the shared
-    # mount (that would send background refreshes to the shared copy again).
-    [ -L "$LOCAL/.credentials.json" ] && rm -f "$LOCAL/.credentials.json"
-    # Seed / refresh from the shared master when the local copy is missing or the
-    # host's is newer (e.g. you just logged in on the host).
-    if [ -f "$SHARED/.credentials.json" ] && \
-       { [ ! -f "$LOCAL/.credentials.json" ] || [ "$SHARED/.credentials.json" -nt "$LOCAL/.credentials.json" ]; }; then
-        cp -p "$SHARED/.credentials.json" "$LOCAL/.credentials.json"
-        chmod 600 "$LOCAL/.credentials.json"
-    fi
+[ -d "$SHARED" ] || exit 0
+[ "$LOCAL" = "$SHARED" ] && exit 0        # isolation off (config dir IS the mount)
+mkdir -p "$LOCAL"
+
+# Link entries not already present locally: never clobber something already there,
+# but pick up new shared entries over time. The two identity files are skipped here
+# and seeded as real copies below.
+for src in "$SHARED"/* "$SHARED"/.[!.]*; do
+    [ -e "$src" ] || continue                       # guard unmatched globs
+    name="$(basename "$src")"
+    case "$name" in .credentials.json|.claude.json) continue ;; esac
+    if [ -e "$LOCAL/$name" ] || [ -L "$LOCAL/$name" ]; then continue; fi
+    ln -s "$src" "$LOCAL/$name"
+done
+
+# .claude.json holds the login account. Seed it ONCE (when the local copy is
+# missing) from the shared master so a fresh container inherits the host login;
+# after that it's container-local and never re-clobbered, so `claude mcp add` and
+# any evolving state stay put. Must be a real file, never a symlink back to the
+# shared mount (that would send every container's writes host-globally).
+[ -L "$LOCAL/.claude.json" ] && rm -f "$LOCAL/.claude.json"
+if [ -f "$SHARED/.claude.json" ] && [ ! -f "$LOCAL/.claude.json" ]; then
+    cp -p "$SHARED/.claude.json" "$LOCAL/.claude.json"
+    chmod 600 "$LOCAL/.claude.json"
 fi
+
+# .credentials.json: real per-container copy (never a symlink, or background token
+# refreshes would hit the shared copy again). Seed/refresh when the local copy is
+# missing or the host's is newer (e.g. you just logged in on the host).
+[ -L "$LOCAL/.credentials.json" ] && rm -f "$LOCAL/.credentials.json"
+if [ -f "$SHARED/.credentials.json" ] && \
+   { [ ! -f "$LOCAL/.credentials.json" ] || [ "$SHARED/.credentials.json" -nt "$LOCAL/.credentials.json" ]; }; then
+    cp -p "$SHARED/.credentials.json" "$LOCAL/.credentials.json"
+    chmod 600 "$LOCAL/.credentials.json"
+fi
+ISOLATE
+
+# --- shared postStart: git identity + gh auth from the mounted token ----------
+install -m 0755 /dev/stdin "$SHARE/post-start.sh" <<'POSTSTART'
+#!/usr/bin/env bash
+# Shared postStartCommand for trimmi-de repos. Runs on every start; never blocks.
+set -u
+
+# --- Claude Code per-container credential + login isolation -------------------
+# Seed the container-local CLAUDE_CONFIG_DIR from the shared ~/.claude mount and
+# refresh the OAuth token when the host's is newer. post-create already ran this
+# once (before `claude mcp add`) so login lands first; here it keeps credentials
+# fresh across restarts. See claude-isolate.sh for the full rationale.
+bash /usr/local/share/trimmi/claude-isolate.sh || true
 
 if [ -n "${HOST_GIT_USER:-}" ]; then
     git config --global user.name "$HOST_GIT_USER"
@@ -203,13 +235,19 @@ fi
 # host-mounted dotenv itself) and AIDER_MODEL=deepseek. Same idea as Claude Code
 # reading its creds from the bind-mounted ~/.claude — nothing to source or write.
 
+# Seed the isolated CLAUDE_CONFIG_DIR (login + credentials) BEFORE any claude
+# command writes a fresh .claude.json. Without this, the `claude mcp add` below
+# creates a .claude.json with MCP servers but no oauthAccount, and post-start's
+# later seed is skipped (file already exists) -> the container is "not logged in".
+bash /usr/local/share/trimmi/claude-isolate.sh || true
+
 echo "=== [trimmi] user-scope MCP servers (serena, rtk) ==="
 # Shared MCP servers live at USER scope so every trimmi repo gets them without
 # hardcoding them into each repo's project-scope .mcp.json (which stays app-owned).
-# Claude Code merges user + project scopes, so both are active at once. The config
-# dir (~/.claude) is bind-mounted from the host, so this writes host-globally —
-# accepted trade-off. remove-then-add is idempotent across rebuilds and also picks
-# up any change to a server's definition here.
+# Claude Code merges user + project scopes, so both are active at once. This writes
+# to $CLAUDE_CONFIG_DIR/.claude.json, which is the container-local isolated dir
+# (seeded from the host just above), so it does NOT leak host-globally. remove-then-add
+# is idempotent across rebuilds and also picks up any change to a server's definition here.
 if command -v claude >/dev/null 2>&1; then
     claude mcp remove --scope user serena >/dev/null 2>&1 || true
     # --open-web-dashboard False: keep the dashboard reachable at localhost:24282 but stop
