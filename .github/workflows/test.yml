@@ -1,0 +1,42 @@
+name: Test trimmi-base
+
+# Server-side backstop for the pre-push hook: runs the feature tests (Claude/aider/gh
+# login + mount consumption) and the static metadata validation on every push and PR
+# that touches the feature or its tests. This is the guarantee that nothing broken
+# reaches main even if someone pushes with `--no-verify`.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "src/**"
+      - "test/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "test/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate feature metadata (mounts + containerEnv)
+        run: bash test/validate-metadata.sh
+
+      - name: Install devcontainer CLI
+        run: npm install -g @devcontainers/cli
+
+      - name: Run trimmi-base feature tests
+        run: |
+          devcontainer features test \
+            --project-folder . \
+            --features trimmi-base \
+            --base-image mcr.microsoft.com/devcontainers/base:ubuntu-24.04 \
+            --skip-scenarios
