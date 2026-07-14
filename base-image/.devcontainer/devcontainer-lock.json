@@ -21,9 +21,9 @@
       "integrity": "sha256:0c55e65f2e3df736e478f26ee4d5ed41bae6b54dac1318c443e31444c8ed283c"
     },
     "ghcr.io/trimmi-de/devcontainer-features/trimmi-base:1": {
-      "version": "1.5.2",
-      "resolved": "ghcr.io/trimmi-de/devcontainer-features/trimmi-base@sha256:1052b7365f8c3ad20ba73dfd3e67331bc317c39d7ef632c0ee4b4fbb712f6fc6",
-      "integrity": "sha256:1052b7365f8c3ad20ba73dfd3e67331bc317c39d7ef632c0ee4b4fbb712f6fc6",
+      "version": "1.5.3",
+      "resolved": "ghcr.io/trimmi-de/devcontainer-features/trimmi-base@sha256:a1bb3bbb75d1e593fd2587f8ba5b74242ec79f24b902d17efb27cea6488187b4",
+      "integrity": "sha256:a1bb3bbb75d1e593fd2587f8ba5b74242ec79f24b902d17efb27cea6488187b4",
       "dependsOn": [
         "ghcr.io/devcontainers/features/python:1",
         "ghcr.io/devcontainers/features/github-cli:1",
