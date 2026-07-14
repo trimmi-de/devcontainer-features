@@ -20,6 +20,11 @@ check "AIDER_ENV_FILE set"     bash -c '[ "$AIDER_ENV_FILE" = "/home/vscode/.aid
 check "AIDER_READ set"         bash -c '[ "$AIDER_READ" = "/home/vscode/.claude/CLAUDE.md" ]'
 check "AIDER_AUTO_COMMITS off" bash -c '[ "$AIDER_AUTO_COMMITS" = "false" ]'
 check "AIDER_MODEL_WARN off"   bash -c '[ "$AIDER_SHOW_MODEL_WARNINGS" = "false" ]'
+# No interactive startup prompts: analytics opt-in (the "see the docs?" one),
+# the .gitignore prompt, and the update-check nag are all disabled up front.
+check "AIDER_ANALYTICS off"    bash -c '[ "$AIDER_ANALYTICS_DISABLE" = "true" ]'
+check "AIDER_GITIGNORE off"    bash -c '[ "$AIDER_GITIGNORE" = "false" ]'
+check "AIDER_CHECK_UPDATE off" bash -c '[ "$AIDER_CHECK_UPDATE" = "false" ]'
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "shared claude-isolate"  bash -c "test -x /usr/local/share/trimmi/claude-isolate.sh"
@@ -32,5 +37,80 @@ check "rtk telemetry off"      bash -c '[ "$RTK_TELEMETRY_DISABLED" = "1" ]'
 check "gh from dependency"     bash -c "command -v gh"
 check "cargo from dependency"  bash -c "command -v cargo || test -x /usr/local/cargo/bin/cargo"
 check "python 3.14 from dep"   bash -c "(python --version 2>&1 || true; python3 --version 2>&1 || true) | grep -q 'Python 3\.14'"
+
+# --- login + mount-consumption tests -----------------------------------------
+# The feature-test harness has no real host bind-mounts, so these simulate the
+# *contents* each mount delivers and assert the tool actually consumes them —
+# i.e. the exact chains that broke: Claude login surviving per-container
+# isolation (~/.claude), aider reading its DeepSeek key (~/.aider_env), and gh
+# reading its token (~/.gh_token_env). "all mounts declared" is covered
+# statically by test/validate-metadata.sh (run in the pre-push hook + CI).
+
+# Claude login (~/.claude): claude-isolate.sh must seed the isolated
+# CLAUDE_CONFIG_DIR with the host login (.claude.json oauthAccount) and a REAL
+# .credentials.json copy (never a symlink), and symlink shared config (CLAUDE.md).
+check "claude login: isolation seeds oauthAccount + real creds copy" bash -c '
+  set -e
+  t=$(mktemp -d); export HOME=$t CLAUDE_CONFIG_DIR=$t/.claude-local
+  mkdir -p "$t/.claude"
+  printf "%s" "{\"oauthAccount\":{\"emailAddress\":\"t@e.com\"},\"mcpServers\":{}}" > "$t/.claude/.claude.json"
+  printf "%s" "{\"tok\":1}" > "$t/.claude/.credentials.json"
+  printf "shared" > "$t/.claude/CLAUDE.md"
+  bash /usr/local/share/trimmi/claude-isolate.sh
+  grep -q oauthAccount "$CLAUDE_CONFIG_DIR/.claude.json"
+  [ -L "$CLAUDE_CONFIG_DIR/CLAUDE.md" ]
+  [ -f "$CLAUDE_CONFIG_DIR/.credentials.json" ] && [ ! -L "$CLAUDE_CONFIG_DIR/.credentials.json" ]
+'
+
+# Guards the postCreate-before-postStart ordering fix: a re-run (post-start)
+# must NOT clobber the container-local login or the serena entry mcp add wrote.
+check "claude login: re-run keeps container-local login + mcp" bash -c '
+  set -e
+  t=$(mktemp -d); export HOME=$t CLAUDE_CONFIG_DIR=$t/.claude-local
+  mkdir -p "$t/.claude"; printf "%s" "{\"oauthAccount\":{\"e\":1}}" > "$t/.claude/.claude.json"
+  bash /usr/local/share/trimmi/claude-isolate.sh
+  printf "%s" "{\"oauthAccount\":{\"e\":1},\"mcpServers\":{\"serena\":{}}}" > "$CLAUDE_CONFIG_DIR/.claude.json"
+  bash /usr/local/share/trimmi/claude-isolate.sh
+  grep -q oauthAccount "$CLAUDE_CONFIG_DIR/.claude.json" && grep -q serena "$CLAUDE_CONFIG_DIR/.claude.json"
+'
+
+# aider login (~/.aider_env): aider must load DEEPSEEK_API_KEY from AIDER_ENV_FILE.
+# The "DEEPSEEK_API_KEY: Not set" warning appears only when the key is absent.
+check "aider login: loads DEEPSEEK_API_KEY from AIDER_ENV_FILE" bash -c '
+  set -e
+  t=$(mktemp -d); printf "DEEPSEEK_API_KEY=sk-test-abc\n" > "$t/aider_env"
+  out=$(env -i HOME="$t" PATH="$PATH" AIDER_ENV_FILE="$t/aider_env" AIDER_SHOW_MODEL_WARNINGS=true \
+        aider --model deepseek --no-git --exit --yes 2>&1)
+  ! printf "%s" "$out" | grep -q "DEEPSEEK_API_KEY: Not set"
+'
+
+# Negative control: proves the assertion above is real (a missing key IS detected).
+check "aider login: flags a missing key (negative control)" bash -c '
+  set -e
+  t=$(mktemp -d); printf "AIDER_MODEL=deepseek\n" > "$t/aider_env"
+  out=$(env -i HOME="$t" PATH="$PATH" AIDER_ENV_FILE="$t/aider_env" AIDER_SHOW_MODEL_WARNINGS=true \
+        aider --model deepseek --no-git --exit --yes 2>&1)
+  printf "%s" "$out" | grep -q "DEEPSEEK_API_KEY: Not set"
+'
+
+# gh login (~/.gh_token_env): the mounted dotenv must export GH_TOKEN when
+# sourced — exactly how post-start.sh and ~/.bashrc consume it.
+check "gh login: gh_token_env sources GH_TOKEN" bash -c '
+  set -e
+  t=$(mktemp -d); printf "export GH_TOKEN=ghp_test123\n" > "$t/.gh_token_env"
+  ( . "$t/.gh_token_env"; [ "$GH_TOKEN" = "ghp_test123" ] )
+'
+
+# serena dashboard: post-create registered serena at user scope with the
+# dashboard/browser/GUI fully disabled. Assert the stored command carries all
+# three kill-switches (post-create ran above, writing $CLAUDE_CONFIG_DIR/.claude.json).
+# A runtime proof (serena launched, port 24282 stays closed) lives in the heavier,
+# on-demand test/serena-dashboard-check.sh.
+check "serena: dashboard/browser/gui disabled in registration" bash -c '
+  f="${CLAUDE_CONFIG_DIR:-$HOME/.claude-local}/.claude.json"
+  grep -q -- "--enable-web-dashboard" "$f" \
+    && grep -q -- "--open-web-dashboard" "$f" \
+    && grep -q -- "--enable-gui-log-window" "$f"
+'
 
 reportResults

@@ -250,11 +250,15 @@ echo "=== [trimmi] user-scope MCP servers (serena, rtk) ==="
 # is idempotent across rebuilds and also picks up any change to a server's definition here.
 if command -v claude >/dev/null 2>&1; then
     claude mcp remove --scope user serena >/dev/null 2>&1 || true
-    # --open-web-dashboard False: keep the dashboard reachable at localhost:24282 but stop
-    # serena auto-opening it in a browser on every Claude Code start (the flag maps to the
-    # web_dashboard_open_on_launch config, which defaults to true). Value is required.
+    # Kill the dashboard entirely, not just its browser pop-up:
+    #   --enable-web-dashboard False   don't run the dashboard web server at all
+    #                                  (nothing to serve at localhost:24282 → nothing to open)
+    #   --open-web-dashboard   False   belt-and-suspenders: never auto-open a browser
+    #   --enable-gui-log-window False  never spawn the tkinter GUI log window
+    # (Booleans take an explicit value in serena's CLI.)
     claude mcp add --scope user serena -- uvx --from git+https://github.com/oraios/serena \
-        serena start-mcp-server --context claude-code --project-from-cwd --open-web-dashboard False \
+        serena start-mcp-server --context claude-code --project-from-cwd \
+        --enable-web-dashboard False --open-web-dashboard False --enable-gui-log-window False \
         || echo "WARNING: serena mcp add failed"
     claude mcp remove --scope user rtk >/dev/null 2>&1 || true
     claude mcp add --scope user rtk -- rtk-mcp || echo "WARNING: rtk mcp add failed"
