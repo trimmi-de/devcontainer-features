@@ -21,6 +21,12 @@ if ! command -v devcontainer >/dev/null 2>&1; then
   echo "           Install it:  npm install -g @devcontainers/cli   (needs Docker running)."
   exit 1
 fi
+# The feature declares the four host bind-mounts, so the test container only
+# starts if their sources exist — pre-create them (the initializeCommand guard).
+# Create ONLY when missing: existing ones may be read-only bind mounts, so a
+# blind `touch` would fail. Empty placeholders are fine for the tests.
+for d in ~/.claude ~/.serena;        do [ -d "$d" ] || mkdir -p "$d"; done
+for f in ~/.aider_env ~/.gh_token_env; do [ -e "$f" ] || touch "$f";   done
 devcontainer features test \
   --project-folder "$repo" \
   --features trimmi-base \
