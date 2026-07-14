@@ -25,6 +25,7 @@ check "AIDER_MODEL_WARN off"   bash -c '[ "$AIDER_SHOW_MODEL_WARNINGS" = "false"
 check "AIDER_ANALYTICS off"    bash -c '[ "$AIDER_ANALYTICS_DISABLE" = "true" ]'
 check "AIDER_GITIGNORE off"    bash -c '[ "$AIDER_GITIGNORE" = "false" ]'
 check "AIDER_CHECK_UPDATE off" bash -c '[ "$AIDER_CHECK_UPDATE" = "false" ]'
+check "AIDER_RELEASE_NOTES off" bash -c '[ "$AIDER_SHOW_RELEASE_NOTES" = "false" ]'
 check "shared post-start.sh"   bash -c "test -x /usr/local/share/trimmi/post-start.sh"
 check "shared post-create.sh"  bash -c "test -x /usr/local/share/trimmi/post-create.sh"
 check "shared claude-isolate"  bash -c "test -x /usr/local/share/trimmi/claude-isolate.sh"
@@ -91,6 +92,20 @@ check "aider login: flags a missing key (negative control)" bash -c '
   out=$(env -i HOME="$t" PATH="$PATH" AIDER_ENV_FILE="$t/aider_env" AIDER_SHOW_MODEL_WARNINGS=true \
         aider --model deepseek --no-git --exit --yes 2>&1)
   printf "%s" "$out" | grep -q "DEEPSEEK_API_KEY: Not set"
+'
+
+# aider startup: no interactive questions. The .gitignore prompt is the one that
+# actually mutates the repo, so test it behaviourally: with AIDER_GITIGNORE=false
+# aider must NOT add .aider* to .gitignore (with it on, it does — see /tmp control).
+# The analytics opt-in ("see the docs?"), update-check and release-notes prompts
+# are asserted via their env vars above (they only fire on a TTY, not reproducible here).
+check "aider startup: AIDER_GITIGNORE=false leaves .gitignore untouched" bash -c '
+  set -e
+  t=$(mktemp -d); cd "$t"; git init -q; git config user.email t@e.com; git config user.name t
+  printf "DEEPSEEK_API_KEY=sk-x\n" > envf
+  env -i HOME="$t" PATH="$PATH" AIDER_ENV_FILE="$t/envf" AIDER_MODEL=deepseek AIDER_GITIGNORE=false \
+    aider --model deepseek --exit --yes </dev/null >/dev/null 2>&1 || true
+  ! { [ -f .gitignore ] && grep -q "[.]aider" .gitignore; }
 '
 
 # gh login (~/.gh_token_env): the mounted dotenv must export GH_TOKEN when
